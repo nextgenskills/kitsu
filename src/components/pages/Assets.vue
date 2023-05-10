@@ -20,7 +20,7 @@
               @click="modals.isBuildFilterDisplayed = true"
             />
             <div class="flexrow-item filler"></div>
-            <div class="flexrow flexrow-item" v-if="!isCurrentUserClient">
+            <div class="flexrow flexrow-item" v-if="!isCurrentUserClient && !isSimpleMode">
               <combobox-department
                 class="combobox-department flexrow-item"
                 :selectable-departments="selectableDepartments('Asset')"

@@ -462,7 +462,7 @@ export default {
         options = options.concat([
           { label: 'separator', value: 'separator' },
           { label: this.$t('schedule.title'), value: 'schedule' },
-          { label: this.$t('quota.title'), value: 'quota' },
+          //{ label: this.$t('quota.title'), value: 'quota' },
           { label: this.$t('people.team'), value: 'team' }
         ])
 

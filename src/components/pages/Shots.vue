@@ -28,7 +28,7 @@
               v-if="currentEpisode && currentEpisode.description"
             />
             <div class="filler"></div>
-            <div class="flexrow flexrow-item" v-if="!isCurrentUserClient">
+            <div class="flexrow flexrow-item" v-if="!isCurrentUserClient && !isSimpleMode">
               <combobox-department
                 class="combobox-department flexrow-item"
                 :selectable-departments="selectableDepartments('Shot')"
@@ -499,7 +499,8 @@ export default {
       'shotListScrollPosition',
       'shotSorting',
       'taskTypeMap',
-      'user'
+      'user',
+      'isSimpleMode'
     ]),
 
     searchField() {

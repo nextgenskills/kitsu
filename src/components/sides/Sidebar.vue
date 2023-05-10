@@ -41,7 +41,7 @@
             </p>
           </div>
 
-          <div v-if="!isCurrentUserClient && !isCurrentUserVendor">
+          <div v-if="isCurrentUserAdmin || isCurrentUserManager">
             <h2>{{ $t('main.studio') }}</h2>
 
             <p @click="toggleSidebar()" v-if="isCurrentUserAdmin">
@@ -215,7 +215,8 @@ export default {
       'isCurrentUserSupervisor',
       'isCurrentUserVendor',
       'isSidebarHidden',
-      'organisation'
+      'organisation',
+      'isSimpleMode'
     ])
   },
 
