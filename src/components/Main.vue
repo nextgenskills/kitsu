@@ -4,6 +4,7 @@
       <topbar />
       <sidebar />
       <router-view />
+      <help-box text="helllooo" />
     </div>
   </XyzTransition>
 </template>
@@ -11,12 +12,14 @@
 <script>
 import Topbar from '@/components/tops/Topbar'
 import Sidebar from '@/components/sides/Sidebar'
+import HelpBox from '@/components/widgets/HelpBox'
 
 export default {
   name: 'main-wrapper',
   components: {
     Topbar,
-    Sidebar
+    Sidebar,
+    HelpBox
   },
 
   mounted() {
