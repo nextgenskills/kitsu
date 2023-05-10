@@ -11,7 +11,7 @@
       >
         <div class="has-text-centered login-header">
           <img src="../../assets/kitsu-text-dark.svg" v-if="isDarkTheme" />
-          <img src="../../assets/kitsu-text.svg" v-else />
+          <img src="../../assets/nextgen-kitsu.png" v-else />
         </div>
         <form>
           <div class="field mt2" v-show="!(isMissingOTP || isWrongOTP)">
