@@ -29,6 +29,7 @@
             <li
               :class="{ 'is-active': isTabActive('timesheets') }"
               @click="selectTab('timesheets')"
+              v-if="!isSimpleMode"
             >
               <router-link
                 :to="{
@@ -220,7 +221,8 @@ export default {
       'todoListScrollPosition',
       'todoSelectionGrid',
       'todoSearchQueries',
-      'user'
+      'user',
+      'isSimpleMode'
     ]),
 
     loggableTodos() {

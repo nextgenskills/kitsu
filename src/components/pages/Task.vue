@@ -461,7 +461,8 @@ export default {
       'taskStatusForCurrentUser',
       'taskMap',
       'taskTypeMap',
-      'user'
+      'user',
+      'isSimpleMode',
     ]),
 
     previewOptions() {

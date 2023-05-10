@@ -448,7 +448,8 @@ export default {
       'assetSorting',
       'taskTypeMap',
       'taskTypes',
-      'user'
+      'user',
+      'isSimpleMode'
     ]),
 
     newAssetPath() {

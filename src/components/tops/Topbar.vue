@@ -88,13 +88,13 @@
             name: 'todos-tab',
             params: { tab: 'timesheets' }
           }"
-          v-if="!isCurrentUserAdmin && !isCurrentUserClient"
+          v-if="!isCurrentUserAdmin && !isCurrentUserClient && !isSimpleMode"
         >
           {{ $t('timesheets.title') }}
         </router-link>
         <global-search-field class="flexrow-item mr0" />
         <div class="nav-item">
-          <button data-canny-changelog class="changelog-button">
+          <button data-canny-changelog class="changelog-button"  v-if="!isSimpleMode">
             <zap-icon />
           </button>
         </div>
@@ -149,7 +149,7 @@
             {{ $t('main.white_theme') }}
           </span>
         </li>
-        <li @click="setSupportChat(!isSupportChat)">
+        <li @click="setSupportChat(!isSupportChat)" v-if="!isSimpleMode">
           <span v-if="isSupportChat">
             {{ $t('main.hide_support_chat') }}
           </span>
@@ -157,25 +157,26 @@
             {{ $t('main.show_support_chat') }}
           </span>
         </li>
-        <hr />
+        <hr   v-if="!isSimpleMode" />
         <a
           href="https://www.youtube.com/playlist?list=PLp_1gB5ZBHXqnQgZ4TCrAt7smxesaDo29"
           target="_blank"
+          v-if="!isSimpleMode"
         >
           <li>
             {{ $t('main.tutorials') }}
           </li>
         </a>
-        <a @click="display.shortcutModal = true">
+        <a @click="display.shortcutModal = true"  v-if="!isSimpleMode">
           <li>
             {{ $t('keyboard.shortcuts') }}
           </li>
         </a>
-        <hr />
-        <a href="https://discord.gg/VbCxtKN" target="_blank">
+        <hr  v-if="!isSimpleMode" />
+        <a href="https://discord.gg/VbCxtKN" target="_blank"  v-if="!isSimpleMode">
           <li>Discord</li>
         </a>
-        <a href="https://cgwire.canny.io" target="_blank">
+        <a href="https://cgwire.canny.io" target="_blank"  v-if="!isSimpleMode">
           <li>Roadmap / Feedback</li>
         </a>
         <hr />
@@ -184,7 +185,8 @@
             {{ $t('main.about') }}
           </li>
         </a>
-        <li class="version">Kitsu {{ kitsuVersion }}</li>
+        <li class="version">NextGen:RISE</li>
+        <li class="version">Powered by Kitsu</li>
         <hr />
         <li class="flexrow" @click="onLogoutClicked">
           <log-out-icon class="flexrow-item" size="1x" />
@@ -286,7 +288,8 @@ export default {
       'openProductionOptions',
       'productionMap',
       'productionEditTaskTypes',
-      'user'
+      'user',
+      'isSimpleMode'
     ]),
 
     assetSections() {

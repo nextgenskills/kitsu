@@ -56,7 +56,8 @@ export default {
       'taskMap',
       'taskStatusMap',
       'taskTypeMap',
-      'user'
+      'user',
+      'isSimpleMode'
     ])
   },
 

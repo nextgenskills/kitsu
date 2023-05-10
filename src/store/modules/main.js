@@ -5,6 +5,7 @@ import {
   TOGGLE_DARK_THEME,
   TOGGLE_SIDEBAR,
   TOGGLE_SUPPORT_CHAT,
+  TOGGLE_SIMPLE_MODE,
   TOGGLE_USER_MENU,
   SET_LAST_PRODUCTION_SCREEN,
   SET_CURRENT_PRODUCTION,
@@ -16,6 +17,7 @@ import {
 const initialState = {
   currentProductionScreen: 'assets',
   isDarkTheme: false,
+  isSimpleMode: true,
   isSidebarHidden: true,
   isSupportChat: true,
   isUserMenuHidden: true,
@@ -29,6 +31,7 @@ const state = { ...initialState }
 const getters = {
   currentProductionScreen: state => state.currentProductionScreen,
   isDarkTheme: state => state.isDarkTheme,
+  isSimpleMode: state => state.isSimpleMode,
   isSidebarHidden: state => state.isSidebarHidden,
   isSupportChat: state => state.isSupportChat,
   isUserMenuHidden: state => state.isUserMenuHidden,
