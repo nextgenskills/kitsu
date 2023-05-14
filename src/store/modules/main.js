@@ -8,6 +8,7 @@ import {
   TOGGLE_SIMPLE_MODE,
   TOGGLE_USER_MENU,
   SET_LAST_PRODUCTION_SCREEN,
+  SET_HELP_SECTION,
   SET_CURRENT_PRODUCTION,
   SHOW_PREVIEW_FILE,
   HIDE_PREVIEW_FILE,
@@ -23,7 +24,8 @@ const initialState = {
   isUserMenuHidden: true,
   lastProductionScreen: 'assets',
   lastProductionViewed: null,
-  previewFileIdToShow: ''
+  previewFileIdToShow: '',
+  helpSection: ''
 }
 
 const state = { ...initialState }
@@ -37,7 +39,8 @@ const getters = {
   isUserMenuHidden: state => state.isUserMenuHidden,
   lastProductionScreen: state => state.lastProductionScreen,
   lastProductionViewed: state => state.lastProductionViewed,
-  previewFileIdToShow: state => state.previewFileIdToShow
+  previewFileIdToShow: state => state.previewFileIdToShow,
+  helpSection: state => state.helpSection
 }
 
 const actions = {
@@ -63,6 +66,10 @@ const actions = {
 
   setLastProductionScreen({ commit, state }, lastProductionScreen) {
     commit(SET_LAST_PRODUCTION_SCREEN, lastProductionScreen)
+  },
+
+  setHelpSection({ commit, state }, helpSection) {
+    commit(SET_HELP_SECTION, helpSection)
   },
 
   loadEvents({ commit, state }, { after, before }) {
@@ -96,6 +103,10 @@ const mutations = {
 
   [SET_LAST_PRODUCTION_SCREEN](state, lastProductionScreen) {
     state.lastProductionScreen = lastProductionScreen
+  },
+
+  [SET_HELP_SECTION](state, helpSection) {
+    state.helpSection = helpSection
   },
 
   [SET_CURRENT_PRODUCTION](state, productionId) {
