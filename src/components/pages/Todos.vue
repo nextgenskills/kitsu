@@ -447,7 +447,7 @@ export default {
 
   metaInfo() {
     return {
-      title: `${this.$t('tasks.my_tasks')} - Kitsu`
+      title: `${this.$t('tasks.my_tasks')} - NextGen:RISE`
     }
   }
 }

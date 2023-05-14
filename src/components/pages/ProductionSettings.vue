@@ -292,7 +292,7 @@ export default {
     return {
       title: `${this.currentProduction.name} | ${this.$t(
         'settings.title'
-      )} - Kitsu`
+      )} - NextGen:RISE`
     }
   }
 }

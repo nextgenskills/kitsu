@@ -493,7 +493,7 @@ export default {
       }
       return (
         `${productionName} - ${episodeName}` +
-        ` | ${this.$t('assets.title')} - Kitsu`
+        ` | ${this.$t('assets.title')} - NextGen:RISE`
       )
     },
 
@@ -501,7 +501,7 @@ export default {
       const productionName = this.currentProduction
         ? this.currentProduction.name
         : ''
-      return `${productionName} ${this.$t('assets.title')} - Kitsu`
+      return `${productionName} ${this.$t('assets.title')} - NextGen:RISE`
     },
 
     dataMatchers() {

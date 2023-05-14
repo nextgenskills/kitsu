@@ -170,7 +170,7 @@ export default {
 
   metaInfo() {
     return {
-      title: `${this.$t('custom_actions.title')} - Kitsu`
+      title: `${this.$t('custom_actions.title')} - NextGen:RISE`
     }
   }
 }

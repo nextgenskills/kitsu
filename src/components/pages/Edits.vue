@@ -995,13 +995,13 @@ export default {
           this.currentEpisode
             ? this.currentEpisode.name || this.$t('main.all')
             : ''
-        } | ${this.$t('edits.title')} - Kitsu`
+        } | ${this.$t('edits.title')} - NextGen:RISE`
       }
     } else {
       return {
         title: `${this.currentProduction.name} ${this.$t(
           'edits.title'
-        )} - Kitsu`
+        )} - NextGen:RISE`
       }
     }
   }

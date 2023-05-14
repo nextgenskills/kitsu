@@ -664,7 +664,7 @@ export default {
     return {
       title: `${this.currentProduction.name} ${this.$t(
         'sequences.title'
-      )} - Kitsu`
+      )} - NextGen:RISE`
     }
   }
 }

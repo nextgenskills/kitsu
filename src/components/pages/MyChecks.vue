@@ -414,7 +414,7 @@ export default {
 
   metaInfo() {
     return {
-      title: `${this.$t('tasks.my_checks')} - Kitsu`
+      title: `${this.$t('tasks.my_checks')} - NextGen:RISE`
     }
   }
 }

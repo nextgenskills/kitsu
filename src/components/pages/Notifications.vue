@@ -496,7 +496,7 @@ export default {
 
   metaInfo() {
     return {
-      title: `${this.$t('notifications.title')} - Kitsu`
+      title: `${this.$t('notifications.title')} - NextGen:RISE`
     }
   }
 }

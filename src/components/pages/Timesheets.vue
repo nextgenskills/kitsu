@@ -525,7 +525,7 @@ export default {
 
   metaInfo() {
     return {
-      title: `${this.$t('timesheets.title')} - Kitsu`
+      title: `${this.$t('timesheets.title')} - NextGen:RISE`
     }
   }
 }

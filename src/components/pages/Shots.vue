@@ -1165,13 +1165,13 @@ export default {
         title:
           `${this.currentProduction ? this.currentProduction.name : ''}` +
           ` - ${this.currentEpisode ? this.currentEpisode.name : ''}` +
-          ` | ${this.$t('shots.title')} - Kitsu`
+          ` | ${this.$t('shots.title')} - NextGen:RISE`
       }
     } else {
       return {
         title: `${this.currentProduction.name} ${this.$t(
           'shots.title'
-        )} - Kitsu`
+        )} - NextGen:RISE`
       }
     }
   }

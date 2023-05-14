@@ -149,7 +149,7 @@ export default {
 
   metaInfo() {
     return {
-      title: `${this.$t('task_status.title')} - Kitsu`
+      title: `${this.$t('task_status.title')} - NextGen:RISE`
     }
   }
 }

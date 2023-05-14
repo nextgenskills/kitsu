@@ -630,7 +630,7 @@ export default {
 
   metaInfo() {
     return {
-      title: this.person ? `${this.person.name} - Kitsu` : '... - Kitsu'
+      title: this.person ? `${this.person.name} - NextGen:RISE` : '... - NextGen:RISE'
     }
   },
 

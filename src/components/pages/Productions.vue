@@ -198,7 +198,7 @@ export default {
 
   metaInfo() {
     return {
-      title: `${this.$t('productions.title')} - Kitsu`
+      title: `${this.$t('productions.title')} - NextGen:RISE`
     }
   }
 }
