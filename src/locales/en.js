@@ -334,7 +334,7 @@ export default {
     reset_password_title: 'Enter your email to reset your password',
     retry_fido_challenge: 'Retry FIDO challenge',
     send_email_otp: 'Resend OTP by email',
-    title: 'Log in to Kitsu',
+    title: 'Log in to NextGen:RISE',
     too_many_failed_login_attemps: 'Too many failed login attempts, please wait one minute.',
     unable_to_verify_email_otp: 'Unable to verify with email?',
     unable_to_verify_recovery_code: 'Don\'t have a recovery code?',
