@@ -180,6 +180,7 @@ export default {
 
   mounted() {
     this.updateActiveTab()
+    this.setHelpSection('todos')
     if (this.todosSearchText.length > 0) {
       this.$refs['todos-search-field'].setValue(this.todosSearchText)
     }
@@ -316,6 +317,7 @@ export default {
       'saveTodoSearch',
       'setDayOff',
       'setTodoListScrollPosition',
+      'setHelpSection',
       'setTodosSearch',
       'setTimeSpent',
       'unsetDayOff'

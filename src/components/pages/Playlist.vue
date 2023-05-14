@@ -604,6 +604,7 @@ export default {
       'removeBuildJobFromList',
       'setAssetSearch',
       'setCurrentEpisode',
+      'setHelpSection',
       'setShotSearch',
       'updatePreviewAnnotation'
     ]),
@@ -1202,6 +1203,7 @@ export default {
 
   mounted() {
     // Next tick needed to ensure that current production is properly set.
+    this.setHelpSection('playlist')
     this.$nextTick(() => {
       this.reloadAll()
       if (localStorage.getItem('playlist-sort')) {

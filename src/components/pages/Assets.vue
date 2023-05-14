@@ -376,6 +376,7 @@ export default {
   },
 
   mounted() {
+    this.setHelpSection('assets')
     let searchQuery = ''
     if (this.assetSearchText.length > 0) {
       this.searchField.setValue(this.assetSearchText)
@@ -539,6 +540,7 @@ export default {
       'restoreAsset',
       'saveAssetSearch',
       'setLastProductionScreen',
+      'setHelpSection',
       'setAssetSearch',
       'setPreview',
       'uploadAssetFile'

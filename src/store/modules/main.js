@@ -25,7 +25,7 @@ const initialState = {
   lastProductionScreen: 'assets',
   lastProductionViewed: null,
   previewFileIdToShow: '',
-  helpSection: ''
+  helpSection: 'default'
 }
 
 const state = { ...initialState }

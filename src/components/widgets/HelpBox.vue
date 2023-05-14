@@ -1,14 +1,16 @@
 <template>
-    <div class="helpbox" @click="minimized=!minimized">
+    <div class="helpbox" @click="minimized=!minimized" v-if="visible">
       <div class="helpbox-title"  v-if="!minimized">Helpful tip</div>
       <div class="helpbox-title-small"  v-if="minimized">Helpful tip <maximize-2-icon class="icon" /></div>
       <div class="helpbox-content" v-if="!minimized">
-      We'll show you lots of hints and tips on how you can perfect your professional skills within each area of the studio pipeline and everyday interactions with colleagues.
+     {{ helpText }}
   </div>
       </div>
   </template>
   
   <script>
+  import { mapGetters, mapActions } from 'vuex'
+
   import {
     ClockIcon,
     EditIcon,
@@ -18,6 +20,11 @@
     TrashIcon
   } from 'vue-feather-icons'
   
+  import {
+  HELP_TEXT
+  } from '@/lib/helptext'
+
+
   export default {
     name: 'help-box',
     props: {
@@ -33,7 +40,28 @@
     components: {
       Maximize2Icon
     },
-  
+    computed: {
+        ...mapGetters([
+        'helpSection'
+        ]),
+        helpText() {
+
+            for (const [key, value] of Object.entries(HELP_TEXT)) {
+                console.log(HELP_TEXT[key].section)
+                if(HELP_TEXT[key].section == this.helpSection){
+                    let value_count = HELP_TEXT[key].values.length;
+                    let random_index = Math.floor(Math.random() * value_count);
+                    return HELP_TEXT[key].values[random_index]
+                }
+            }
+            return '';
+        },
+        visible() {
+            return this.helpText != '';
+        }
+    },
+
+
   }
   </script>
   

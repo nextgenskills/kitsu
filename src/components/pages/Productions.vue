@@ -85,7 +85,9 @@ export default {
       choices: []
     }
   },
-
+  mounted() {
+    this.setHelpSection('myproductions')
+  },
   computed: {
     ...mapGetters([
       'isProductionsLoading',
@@ -113,7 +115,8 @@ export default {
       'deleteProduction',
       'loadProductions',
       'storeProductionPicture',
-      'uploadProductionAvatar'
+      'uploadProductionAvatar',
+      'setHelpSection'
     ]),
 
     // Actions
