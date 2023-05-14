@@ -99,7 +99,7 @@
           </button>
         </div>
         <notification-bell />
-        <div class="nav-item">
+        <div class="nav-item"  v-if="!isSimpleMode">
           <a
             class="changelog-button help-button"
             href="https://kitsu.cg-wire.com/"
@@ -461,7 +461,7 @@ export default {
       if (!this.isCurrentUserClient) {
         options = options.concat([
           { label: 'separator', value: 'separator' },
-          { label: this.$t('schedule.title'), value: 'schedule' },
+          //{ label: this.$t('schedule.title'), value: 'schedule' },
           //{ label: this.$t('quota.title'), value: 'quota' },
           { label: this.$t('people.team'), value: 'team' }
         ])
