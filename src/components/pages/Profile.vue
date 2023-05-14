@@ -807,6 +807,7 @@ export default {
       'preRegisterFIDO',
       'registerFIDO',
       'saveProfile',
+      'setHelpSection',
       'uploadAvatar',
       'unregisterFIDO'
     ]),
@@ -1153,6 +1154,7 @@ export default {
   },
 
   mounted() {
+    this.setHelpSection('profile')
     this.form = Object.assign(this.form, this.user)
     this.form.notifications_enabled = this.form.notifications_enabled
       ? 'true'

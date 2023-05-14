@@ -119,7 +119,9 @@ export default {
       }
     }
   },
-
+  mounted() {
+    this.setHelpSection('productions')
+  },
   computed: {
     ...mapGetters([
       'isCurrentUserAdmin',
@@ -132,7 +134,7 @@ export default {
   },
 
   methods: {
-    ...mapActions(['newProduction']),
+    ...mapActions(['newProduction','setHelpSection']),
 
     generateAvatar(production) {
       const firstLetter = production.name.length > 0 ? production.name[0] : 'P'

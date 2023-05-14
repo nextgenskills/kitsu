@@ -46,6 +46,9 @@ export default {
       isTeamLoadingError: false
     }
   },
+  mounted() {
+    this.setHelpSection('team')
+  },
 
   computed: {
     ...mapGetters([
@@ -72,7 +75,7 @@ export default {
   },
 
   methods: {
-    ...mapActions(['addPersonToTeam']),
+    ...mapActions(['addPersonToTeam','setHelpSection']),
 
     addPerson() {
       if (this.person) {
