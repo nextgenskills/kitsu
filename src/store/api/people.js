@@ -33,7 +33,8 @@ export default {
       hd_by_default: organisation.hd_by_default === 'true',
       chat_token_slack: organisation.chat_token_slack,
       chat_webhook_mattermost: organisation.chat_webhook_mattermost,
-      chat_token_discord: organisation.chat_token_discord
+      chat_token_discord: organisation.chat_token_discord,
+      has_avatar: organisation.has_avatar
     }
     return client.pput(`/api/data/organisations/${organisation.id}`, data)
   },
@@ -45,12 +46,18 @@ export default {
     )
   },
 
+  deleteOrganisationLogo(organisationId) {
+    return client.pput(`/api/data/organisations/${organisationId}`, {
+      has_avatar: false
+    })
+  },
+
   getPeople(callback) {
     client.get('/api/data/persons?relations=true', callback)
   },
 
-  getPerson(personId, callback) {
-    client.get(`/api/data/persons/${personId}`, callback)
+  getPerson(personId) {
+    return client.pget(`/api/data/persons/${personId}`)
   },
 
   createPerson(person) {
@@ -95,7 +102,7 @@ export default {
     return client.pput(`/api/data/persons/${person.id}`, data)
   },
 
-  deletePerson(person, callback) {
+  deletePerson(person) {
     return client.pdel(`/api/data/persons/${person.id}?force=true`)
   },
 
@@ -105,14 +112,14 @@ export default {
       password_2: form.password2
     }
     return client.ppost(
-      `api/actions/persons/${person.id}/change-password`,
+      `/api/actions/persons/${person.id}/change-password`,
       data
     )
   },
 
   disableTwoFactorAuthenticationPerson(person) {
     return client.pdel(
-      `api/actions/persons/${person.id}/disable-two-factor-authentication`
+      `/api/actions/persons/${person.id}/disable-two-factor-authentication`
     )
   },
 
@@ -122,12 +129,8 @@ export default {
     return client.ppost(path, formData)
   },
 
-  postAvatar(userId, formData, callback) {
-    client.post(
-      `/api/pictures/thumbnails/persons/${userId}`,
-      formData,
-      callback
-    )
+  postAvatar(userId, formData) {
+    return client.ppost(`/api/pictures/thumbnails/persons/${userId}`, formData)
   },
 
   changePassword(form, callback) {
@@ -218,11 +221,44 @@ export default {
   },
 
   getPersonTasks(personId, callback) {
+    if (!callback) {
+      return client.pget(`/api/data/persons/${personId}/tasks`)
+    }
     client.get(`/api/data/persons/${personId}/tasks`, callback)
   },
 
   getPersonDoneTasks(personId, callback) {
+    if (!callback) {
+      return client.pget(`/api/data/persons/${personId}/done-tasks`)
+    }
     client.get(`/api/data/persons/${personId}/done-tasks`, callback)
+  },
+
+  getUserSearchFilterGroups() {
+    return client.pget('/api/data/user/filter-groups')
+  },
+
+  createFilterGroup(listType, name, color, productionId, entityType) {
+    const data = {
+      list_type: listType,
+      name,
+      color,
+      project_id: productionId,
+      entity_type: entityType
+    }
+    return client.ppost('/api/data/user/filter-groups', data)
+  },
+
+  updateFilterGroup(filterGroup) {
+    const data = {
+      name: filterGroup.name,
+      color: filterGroup.color
+    }
+    return client.pput(`/api/data/user/filter-groups/${filterGroup.id}`, data)
+  },
+
+  removeFilterGroup(filterGroup) {
+    return client.pdel(`/api/data/user/filter-groups/${filterGroup.id}`)
   },
 
   getUserSearchFilters(callback) {
@@ -232,7 +268,8 @@ export default {
   updateFilter(searchFilter) {
     const data = {
       name: searchFilter.name,
-      search_query: searchFilter.search_query
+      search_query: searchFilter.search_query,
+      search_filter_group_id: searchFilter.search_filter_group_id
     }
     return client.pput(`/api/data/user/filters/${searchFilter.id}`, data)
   },
@@ -248,7 +285,7 @@ export default {
     return client.ppost('/api/data/user/filters', data)
   },
 
-  removeFilter(searchFilter, callback) {
+  removeFilter(searchFilter) {
     return client.pdel(`/api/data/user/filters/${searchFilter.id}`)
   },
 

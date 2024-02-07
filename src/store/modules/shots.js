@@ -62,7 +62,9 @@ import {
   CLEAR_SELECTED_TASKS,
   SET_PREVIEW,
   SAVE_SHOT_SEARCH_END,
+  SAVE_SHOT_SEARCH_FILTER_GROUP_END,
   REMOVE_SHOT_SEARCH_END,
+  REMOVE_SHOT_SEARCH_FILTER_GROUP_END,
   CHANGE_SHOT_SORT,
   UPDATE_METADATA_DESCRIPTOR_END,
   LOCK_SHOT,
@@ -246,6 +248,7 @@ const initialState = {
   shotMap: new Map(),
   shotSearchText: '',
   shotSearchQueries: [],
+  shotSearchFilterGroups: [],
   shotSorting: [],
 
   isFps: false,
@@ -288,6 +291,7 @@ const getters = {
   shotValidationColumns: state => state.shotValidationColumns,
 
   shotSearchQueries: state => state.shotSearchQueries,
+  shotSearchFilterGroups: state => state.shotSearchFilterGroups,
   shotMap: state => state.shotMap,
   shotSorting: state => state.shotSorting,
 
@@ -376,6 +380,7 @@ const actions = {
     const production = rootGetters.currentProduction
     const episodes = rootGetters.episodes
     const userFilters = rootGetters.userFilters
+    const userFilterGroups = rootGetters.userFilterGroups
     const taskTypeMap = rootGetters.taskTypeMap
     const taskMap = rootGetters.taskMap
     const episodeMap = rootGetters.episodeMap
@@ -419,6 +424,7 @@ const actions = {
           production,
           shots,
           userFilters,
+          userFilterGroups,
           taskTypeMap,
           taskMap,
           personMap,
@@ -440,7 +446,7 @@ const actions = {
    */
   loadShot({ commit, state, rootGetters }, shotId) {
     const shot = rootGetters.shotMap.get(shotId)
-    if (shot && shot.lock) return
+    if (shot?.lock) return
 
     const personMap = rootGetters.personMap
     const production = rootGetters.currentProduction
@@ -494,11 +500,10 @@ const actions = {
       newShot: data,
       sequences: rootGetters.displayedSequences
     })
-    return shotsApi.updateShot(data).then(shot => {
+    return shotsApi.updateShot(data).finally(() => {
       setTimeout(() => {
-        commit(UNLOCK_SHOT, shot)
+        commit(UNLOCK_SHOT, data)
       }, 2000)
-      return Promise.resolve(shot)
     })
   },
 
@@ -571,28 +576,52 @@ const actions = {
   },
 
   saveShotSearch({ commit, rootGetters }, searchQuery) {
-    const query = state.shotSearchQueries.find(
-      query => query.name === searchQuery
-    )
-    const production = rootGetters.currentProduction
-
-    if (!query) {
-      return peopleApi
-        .createFilter('shot', searchQuery, searchQuery, production.id, null)
-        .then(searchQuery => {
-          commit(SAVE_SHOT_SEARCH_END, { searchQuery, production })
-          return Promise.resolve(searchQuery)
-        })
-    } else {
-      return Promise.resolve()
+    if (state.shotSearchQueries.some(query => query.name === searchQuery)) {
+      return
     }
+    const production = rootGetters.currentProduction
+    return peopleApi
+      .createFilter('shot', searchQuery, searchQuery, production.id, null)
+      .then(searchQuery => {
+        commit(SAVE_SHOT_SEARCH_END, { searchQuery, production })
+        return searchQuery
+      })
+  },
+
+  saveShotSearchFilterGroup({ commit, state, rootGetters }, filterGroup) {
+    const groupExist = state.shotSearchFilterGroups.some(
+      query => query.name === filterGroup.name
+    )
+    if (groupExist) {
+      return
+    }
+
+    const production = rootGetters.currentProduction
+    return peopleApi
+      .createFilterGroup(
+        'shot',
+        filterGroup.name,
+        filterGroup.color,
+        production.id,
+        null
+      )
+      .then(filterGroup => {
+        commit(SAVE_SHOT_SEARCH_FILTER_GROUP_END, { filterGroup, production })
+        return filterGroup
+      })
   },
 
   removeShotSearch({ commit, rootGetters }, searchQuery) {
     const production = rootGetters.currentProduction
     return peopleApi.removeFilter(searchQuery).then(() => {
       commit(REMOVE_SHOT_SEARCH_END, { searchQuery, production })
-      return Promise.resolve()
+    })
+  },
+
+  removeShotSearchFilterGroup({ commit, rootGetters }, filterGroup) {
+    const production = rootGetters.currentProduction
+    return peopleApi.removeFilterGroup(filterGroup).then(() => {
+      commit(REMOVE_SHOT_SEARCH_FILTER_GROUP_END, { filterGroup, production })
     })
   },
 
@@ -747,6 +776,7 @@ const mutations = {
     state.displayedEstimation = 0
     state.displayedFrames = 0
     state.shotSearchQueries = []
+    state.shotSearchFilterGroups = []
     state.displayedSequences = []
     state.displayedSequencesLength = 0
 
@@ -769,6 +799,7 @@ const mutations = {
     state.displayedEstimation = 0
     state.displayedFrames = 0
     state.shotSearchQueries = []
+    state.shotSearchFilterGroups = []
     state.displayedSequences = []
     state.displayedSequencesLength = 0
 
@@ -786,6 +817,7 @@ const mutations = {
       production,
       shots,
       userFilters,
+      userFilterGroups,
       taskMap,
       taskTypeMap,
       personMap,
@@ -843,7 +875,7 @@ const mutations = {
 
       if (!isFps && shot.data.fps) isFps = true
       if (!isFrames && shot.nb_frames) isFrames = true
-      if (!isFrameIn && shot.data.frame_in) isFrameIn = true
+      if (!isFrameIn && shot.data.frame_in != null) isFrameIn = true
       if (!isFrameOut && shot.data.frame_out) isFrameOut = true
       if (!isTime && shot.timeSpent > 0) isTime = true
       if (!isEstimation && shot.estimation > 0) isEstimation = true
@@ -889,16 +921,21 @@ const mutations = {
     state.shotSelectionGrid = buildSelectionGrid(maxX, maxY)
     helpers.setListStats(state, shots)
 
-    if (userFilters.shot && userFilters.shot[production.id]) {
-      state.shotSearchQueries = userFilters.shot[production.id]
-    } else {
-      state.shotSearchQueries = []
-    }
+    state.shotSearchQueries = userFilters.shot?.[production.id] || []
+
+    state.shotSearchFilterGroups = userFilterGroups?.shot?.[production.id] || []
   },
 
   [SAVE_SHOT_SEARCH_END](state, { searchQuery }) {
     state.shotSearchQueries.push(searchQuery)
     state.shotSearchQueries = sortByName(state.shotSearchQueries)
+  },
+
+  [SAVE_SHOT_SEARCH_FILTER_GROUP_END](state, { filterGroup }) {
+    if (!state.shotSearchFilterGroups.includes(filterGroup)) {
+      state.shotSearchFilterGroups.push(filterGroup)
+      state.shotSearchFilterGroups = sortByName(state.shotSearchFilterGroups)
+    }
   },
 
   [REMOVE_SHOT_SEARCH_END](state, { searchQuery }) {
@@ -907,6 +944,15 @@ const mutations = {
     )
     if (queryIndex >= 0) {
       state.shotSearchQueries.splice(queryIndex, 1)
+    }
+  },
+
+  [REMOVE_SHOT_SEARCH_FILTER_GROUP_END](state, { filterGroup }) {
+    const groupIndex = state.shotSearchFilterGroups.findIndex(
+      query => query.name === filterGroup.name
+    )
+    if (groupIndex >= 0) {
+      state.shotSearchFilterGroups.splice(groupIndex, 1)
     }
   },
 
@@ -958,9 +1004,10 @@ const mutations = {
     }
 
     if (!newShot.data) newShot.data = {}
-    if (newShot.data.fps && !state.isFps) state.fps = true
+    if (newShot.data.fps && !state.isFps) state.isFps = true
     if (newShot.nb_frames && !state.isFrames) state.isFrames = true
-    if (newShot.data.frame_in && !state.isFrameIn) state.isFrameIn = true
+    if (newShot.data.frame_in && !state.isFrameIn != null)
+      state.isFrameIn = true
     if (newShot.data.frame_out && !state.isFrameOut) state.isFrameOut = true
     if (newShot.data.resolution && !state.isResolution) {
       state.isResolution = true
@@ -1014,7 +1061,7 @@ const mutations = {
 
     if (shot.data.fps) state.isFps = true
     if (shot.nb_frames) state.isFrames = true
-    if (shot.data.frame_in) state.isFrameIn = true
+    if (shot.data.frame_in != null) state.isFrameIn = true
     if (shot.data.frame_out) state.isFrameOut = true
     if (shot.data.resolution) state.isResolution = true
     if (shot.data.max_retakes) state.isMaxRetakes = true
@@ -1264,12 +1311,16 @@ const mutations = {
 
   [LOCK_SHOT](state, shot) {
     shot = state.shotMap.get(shot.id)
-    if (shot) shot.lock = true
+    if (shot) {
+      shot.lock = !shot.lock ? 1 : shot.lock + 1
+    }
   },
 
   [UNLOCK_SHOT](state, shot) {
     shot = state.shotMap.get(shot.id)
-    if (shot) shot.lock = false
+    if (shot) {
+      shot.lock = !shot.lock ? 0 : shot.lock - 1
+    }
   },
 
   [RESET_ALL](state) {

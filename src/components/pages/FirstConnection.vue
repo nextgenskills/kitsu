@@ -23,7 +23,7 @@
           <p class="control has-icon">
             <input
               class="input is-medium email"
-              type="text"
+              type="email"
               :placeholder="$t('login.fields.email')"
               @keyup.enter="confirmResetPassword"
               v-model="email"
@@ -73,7 +73,7 @@ import { mapGetters, mapActions } from 'vuex'
 import { MailIcon } from 'vue-feather-icons'
 
 export default {
-  name: 'reset-password',
+  name: 'first-connection',
 
   components: {
     MailIcon

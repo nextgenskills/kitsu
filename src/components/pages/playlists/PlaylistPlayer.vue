@@ -36,42 +36,56 @@
         @click="onPlayPreviousEntityClicked"
         :title="$t('playlists.actions.previous_shot')"
         icon="back"
+        v-if="!isFullMode"
       />
       <button-simple
         class="playlist-button flexrow-item"
         @click="onPlayNextEntityClicked"
         :title="$t('playlists.actions.next_shot')"
         icon="forward"
+        v-if="!isFullMode"
       />
 
       <div class="filler"></div>
+      <button-simple
+        class="playlist-button topbar-button flexrow-item"
+        @click="isFullMode = false"
+        :title="$t('playlists.actions.next_shot')"
+        text="Exit build play"
+        v-if="isFullMode"
+      />
+
       <preview-room
         :ref="previewRoomRef"
         :roomId="isValidRoomId(playlist.id) ? playlist.id : ''"
         :joinRoom="joinRoom"
         :leaveRoom="leaveRoom"
-        v-if="isValidRoomId(playlist.id)"
+        v-if="isValidRoomId(playlist.id) && !isFullMode"
       />
       <button-simple
         @click="$emit('show-add-entities')"
         class="playlist-button topbar-button flexrow-item"
         icon="plus"
         :text="addEntitiesText"
-        v-if="isCurrentUserManager && !isAddingEntity"
+        v-if="
+          (isCurrentUserManager || isCurrentUserSupervisor) &&
+          !isAddingEntity &&
+          !isFullMode
+        "
       />
       <button-simple
         @click="$emit('edit-clicked')"
         class="edit-button playlist-button flexrow-item"
         :title="$t('playlists.actions.edit')"
         icon="edit"
-        v-if="isCurrentUserManager"
+        v-if="isCurrentUserManager || isCurrentUserSupervisor"
       />
       <button-simple
         @click="showDeleteModal"
         class="delete-button playlist-button flexrow-item"
         :title="$t('playlists.actions.delete')"
         icon="delete"
-        v-if="isCurrentUserManager"
+        v-if="isCurrentUserManager || isCurrentUserSupervisor"
       />
     </div>
 
@@ -85,11 +99,20 @@
         }"
         ref="video-container"
       >
+        <video
+          ref="full-playlist-player"
+          class="raw-player"
+          :style="{
+            position: isComparisonOverlay ? 'absolute' : 'relative'
+          }"
+          v-show="isFullMode"
+        />
+
         <raw-video-player
           ref="raw-player-comparison"
           class="raw-player"
           :style="{
-            position: isComparisonOverlay ? 'absolute' : 'static'
+            position: isComparisonOverlay ? 'absolute' : 'relative'
           }"
           :entities="entityListToCompare"
           :full-screen="fullScreen"
@@ -103,6 +126,7 @@
             isComparing &&
             isCurrentPreviewMovie &&
             isMovieComparison &&
+            !isFullMode &&
             !isLoading
           "
         />
@@ -122,12 +146,21 @@
               !isCurrentPreviewMovie)
           "
         >
-          <img
+          <picture-viewer
             ref="picture-player-comparison"
             class="picture-preview"
-            :src="currentComparisonPreviewPath"
+            :big="true"
+            :default-height="pictureDefaultHeight"
+            :full-screen="fullScreen"
+            :light="false"
+            :margin-bottom="0"
+            :panzoom="false"
+            :preview="currentPreviewToCompare"
+            :isComparing="isComparing"
+            @loaded="onPictureLoaded"
             v-show="isComparing && isPictureComparison"
           />
+
           <video
             ref="picture-video-player-comparison"
             class="picture-preview"
@@ -149,7 +182,7 @@
           ref="raw-player"
           class="raw-player"
           :style="{
-            position: isComparisonOverlay ? 'absolute' : 'static',
+            position: isComparisonOverlay ? 'absolute' : 'relative',
             opacity: overlayOpacity
           }"
           :entities="entityList"
@@ -159,23 +192,27 @@
           :current-preview-index="currentPreviewIndex"
           :muted="isMuted"
           @entity-change="onPlayerPlayingEntityChange"
-          @frame-update="onFrameUpdate"
+          @frame-update="onRawPlayerFrameUpdate"
           @max-duration-update="onMaxDurationUpdate"
           @metadata-loaded="onMetadataLoaded"
           @play-next="onPlayNext"
           @repeat="onVideoRepeated"
-          v-show="isCurrentPreviewMovie && !isLoading"
+          @video-loaded="onVideoLoaded"
+          v-show="isCurrentPreviewMovie && !isFullMode && !isLoading"
         />
 
         <object-viewer
           ref="object-player"
           class="object-player"
+          :background-url="backgroundUrl"
+          :full-screen="fullScreen"
+          :is-environment-skybox="isEnvironmentSkybox"
+          :is-wireframe="isWireframe"
           :preview-url="currentPreviewDlPath"
           :style="{
             position: isComparisonOverlay ? 'absolute' : 'static',
             opacity: overlayOpacity
           }"
-          :full-screen="fullScreen"
           v-if="isCurrentPreviewModel && !isLoading"
         />
 
@@ -213,16 +250,20 @@
             position: isComparisonOverlay ? 'absolute' : 'static',
             opacity: overlayOpacity,
             left: 0,
-            right: 0
+            right: 0,
+            'z-index': 1
           }"
           v-show="isCurrentPreviewPicture && !isLoading"
         >
-          <img
+          <picture-viewer
             ref="picture-player"
-            id="picture-player"
-            class="picture-preview"
-            :src="isCurrentPreviewPicture ? currentPreviewPath : null"
-            v-show="isCurrentPreviewPicture"
+            :big="true"
+            :default-height="pictureDefaultHeight"
+            :full-screen="fullScreen"
+            :light="false"
+            :margin-bottom="0"
+            :panzoom="false"
+            :preview="currentPreview"
           />
         </div>
 
@@ -234,7 +275,11 @@
           class="canvas-wrapper"
           ref="canvas-wrapper"
           oncontextmenu="return false;"
-          v-show="!isCurrentPreviewFile && isAnnotationsDisplayed"
+          v-show="
+            !isCurrentPreviewFile &&
+            isAnnotationsDisplayed &&
+            !isCurrentPreviewModel
+          "
         >
           <canvas
             id="playlist-annotation-canvas"
@@ -247,18 +292,15 @@
 
       <task-info
         ref="task-info"
-        :class="{
-          'flexrow-item': true,
-          'task-info-column': true,
-          hidden: isCommentsHidden
-        }"
-        :task="task"
+        class="flexrow-item task-info-column"
+        :current-frame="parseInt(currentFrame) - 1"
+        :current-parent-preview="currentPreview"
+        :fps="fps"
         :is-preview="false"
         :silent="isCommentsHidden"
-        :current-time-raw="currentTimeRaw"
-        :current-parent-preview="currentPreview"
-        panel-name="playlist-side-panel"
+        :task="task"
         @time-code-clicked="onTimeCodeClicked"
+        v-show="!isCommentsHidden"
       />
     </div>
 
@@ -266,13 +308,24 @@
       ref="video-progress"
       class="video-progress pull-bottom"
       :annotations="annotations"
+      :fps="fps"
       :frame-duration="frameDuration"
+      :is-playlist="true"
+      :is-full-mode="isFullMode"
+      :is-full-screen="fullScreen"
+      :movie-dimensions="movieDimensions"
       :nb-frames="nbFrames"
       :handle-in="playlist.for_entity === 'shot' ? handleIn : -1"
       :handle-out="playlist.for_entity === 'shot' ? handleOut : -1"
+      :preview-id="currentPreview ? currentPreview.id : ''"
+      :playlist-duration="playlistDuration"
+      :playlist-progress="playlistProgress"
+      :playlist-shot-position="playlistShotPosition"
+      :entity-list="entityList"
       @start-scrub="onScrubStart"
       @end-scrub="onScrubEnd"
       @progress-changed="onProgressChanged"
+      @progress-playlist-changed="onProgressPlaylistChanged"
       @handle-in-changed="onHandleInChanged"
       @handle-out-changed="onHandleOutChanged"
       v-show="isCurrentPreviewMovie && playlist.id && !isAddingEntity"
@@ -290,8 +343,8 @@
     </div>
 
     <div
-      class="playlist-footer flexrow"
       ref="button-bar"
+      class="playlist-footer flexrow"
       v-if="playlist.id && !isAddingEntity"
     >
       <div class="flexrow flexrow-item comparison-buttons" v-if="tempMode">
@@ -348,29 +401,33 @@
       </div>
 
       <div v-if="isCurrentPreviewMovie">
-        <span
-          class="flexrow-item time-indicator is-hidden-desktop"
-          :title="$t('playlists.actions.current_time')"
-        >
-          {{ currentTime }}
-        </span>
-        <span class="flexrow-item time-indicator is-hidden-desktop"> / </span>
-        <span
-          class="flexrow-item time-indicator is-hidden-desktop"
-          :title="$t('playlists.actions.max_duration')"
-        >
-          {{ maxDuration }}
-        </span>
-        <span
-          class="flexrow-item time-indicator mr1"
-          :title="$t('playlists.actions.frame_number')"
-        >
-          ({{ currentFrame }}&nbsp;/&nbsp;{{
-            (nbFrames + '').padStart(3, '0')
-          }})
-        </span>
+        <template v-if="!isFullMode">
+          <span
+            class="flexrow-item time-indicator is-hidden-desktop"
+            :title="$t('playlists.actions.current_time')"
+          >
+            {{ currentTime }}
+          </span>
+          <span class="flexrow-item time-indicator is-hidden-desktop"> / </span>
+          <span
+            class="flexrow-item time-indicator is-hidden-desktop"
+            :title="$t('playlists.actions.max_duration')"
+          >
+            {{ maxDuration }}
+          </span>
+          <span
+            class="flexrow-item time-indicator mr1"
+            :title="$t('playlists.actions.frame_number')"
+          >
+            ({{ currentFrame }}&nbsp;/&nbsp;{{
+              (nbFrames + '').padStart(3, '0')
+            }})
+          </span>
+        </template>
       </div>
+
       <div class="separator"></div>
+
       <template v-if="isCurrentPreviewPicture">
         {{ framesSeenOfPicture }} /
         <input
@@ -408,9 +465,13 @@
         >
           <arrow-up-right-icon class="icon is-small" />
         </a>
+        <div class="separator"></div>
       </div>
 
-      <div class="flexrow flexrow-item mr0" v-if="isCurrentPreviewMovie">
+      <div
+        class="flexrow flexrow-item mr0"
+        v-if="isCurrentPreviewMovie && !isFullMode"
+      >
         <button-simple
           class="button playlist-button flexrow-item"
           :active="isRepeating"
@@ -461,32 +522,20 @@
           icon="music"
           @click="isWaveformDisplayed = !isWaveformDisplayed"
         />
-
-        <!--button-simple
-        class="button playlist-button flexrow-item"
-        @click="onPreviousFrameClicked"
-        :title="$t('playlists.actions.previous_frame')"
-        icon="left"
-      />
-      <button-simple
-        class="button playlist-button flexrow-item"
-        @click="onNextFrameClicked"
-        :title="$t('playlists.actions.next_frame')"
-        icon="right"
-      /-->
+        <div class="separator"></div>
       </div>
 
-      <div class="separator"></div>
+      <div class="separator" v-if="!isFullMode"></div>
       <button-simple
         class="playlist-button flexrow-item"
         :title="$t('playlists.actions.change_task_type')"
         icon="layers"
         @click="showTaskTypeModal"
-        v-if="!tempMode"
+        v-if="!tempMode && !isFullMode"
       />
       <div
         class="flexrow flexrow-item comparison-buttons"
-        v-if="isCurrentPreviewMovie || isCurrentPreviewPicture"
+        v-if="(isCurrentPreviewMovie || isCurrentPreviewPicture) && !isFullMode"
       >
         <button-simple
           :class="{
@@ -553,36 +602,66 @@
           </div>
         </div>
       </div>
+
       <span class="filler"></span>
 
-      <button-simple
-        @click="$emit('save-clicked')"
-        class="playlist-button flexrow-item"
-        :title="$t('playlists.actions.save_playlist')"
-        icon="save"
-        v-if="isCurrentUserManager && tempMode"
-      />
+      <div class="flexrow" v-if="isCurrentPreviewModel">
+        <combobox-styled
+          class="background-combo mr05"
+          :active="Boolean(currentBackground)"
+          :disabled="!productionBackgrounds.length"
+          :is-compact="!productionBackgrounds.length"
+          is-reversed
+          keep-order
+          thin
+          :options="backgroundOptions"
+          v-model="currentBackground"
+          @change="onObjectBackgroundSelected()"
+        >
+          <template #icon>
+            <globe-icon class="icon is-small mr05" />
+          </template>
+        </combobox-styled>
+        <button-simple
+          class="playlist-button flexrow-item"
+          :active="isObjectBackground && isEnvironmentSkybox"
+          :disabled="!objectBackgroundUrl || !isObjectBackground"
+          icon="image"
+          :title="$t('playlists.actions.toggle_environment_skybox')"
+          @click="isEnvironmentSkybox = !isEnvironmentSkybox"
+        />
+        <button-simple
+          class="playlist-button flexrow-item"
+          :active="isWireframe"
+          icon="codepen"
+          :title="$t('playlists.actions.toggle_wireframe')"
+          @click="isWireframe = !isWireframe"
+        />
+      </div>
+
+      <template
+        v-if="(isCurrentUserManager || isCurrentUserSupervisor) && tempMode"
+      >
+        <div class="separator"></div>
+        <button-simple
+          @click="$emit('save-clicked')"
+          class="playlist-button flexrow-item"
+          :title="$t('playlists.actions.save_playlist')"
+          icon="save"
+        />
+      </template>
       <div
         class="flexrow"
         v-if="
           !isCurrentUserArtist &&
-          (isCurrentPreviewMovie || isCurrentPreviewPicture)
+          (isCurrentPreviewMovie || isCurrentPreviewPicture) &&
+          !isFullMode
         "
       >
-        <div class="separator" v-if="isCurrentUserManager && tempMode"></div>
-        <!--button-simple
-        class="playlist-button flexrow-item"
-        icon="undo"
-        :title="$t('playlists.actions.annotation_undo')"
-        @click="undoLastAction"
-      />
-
-      <button-simple
-        class="playlist-button flexrow-item"
-        :title="$t('playlists.actions.annotation_redo')"
-        icon="redo"
-        @click="redoLastAction"
-      /-->
+        <div
+          class="separator"
+          v-if="(isCurrentUserManager || isCurrentUserSupervisor) && tempMode"
+        ></div>
         <button-simple
           @click="isAnnotationsDisplayed = !isAnnotationsDisplayed"
           :class="{
@@ -592,7 +671,9 @@
           }"
           icon="pen"
           :title="$t('playlists.actions.toggle_annotations')"
-          v-if="isCurrentUserManager && !isAddingEntity"
+          v-if="
+            (isCurrentUserManager || isCurrentUserSupervisor) && !isAddingEntity
+          "
         />
         <transition name="slide">
           <div class="annotation-tools" v-show="isTyping">
@@ -652,7 +733,9 @@
           }"
           icon="laser"
           :title="$t('playlists.actions.toggle_laser')"
-          v-if="isCurrentUserManager && !isAddingEntity"
+          v-if="
+            (isCurrentUserManager || isCurrentUserSupervisor) && !isAddingEntity
+          "
         />
         <button-simple
           :class="{
@@ -675,6 +758,7 @@
       <div class="separator"></div>
       <button-simple
         class="button playlist-button flexrow-item"
+        :active="!isCommentsHidden"
         :title="$t('playlists.actions.comments')"
         @click="onCommentClicked"
         icon="comment"
@@ -682,6 +766,7 @@
       <button-simple
         class="playlist-button flexrow-item"
         :title="$t('playlists.actions.entity_list')"
+        :active="!isEntitiesHidden"
         @click="onFilmClicked"
         icon="film"
       />
@@ -706,7 +791,9 @@
             :class="{
               'dl-button': true,
               'mp4-button': true,
-              disabled: !isCurrentUserManager || isJobRunning,
+              disabled:
+                !(isCurrentUserManager || isCurrentUserSupervisor) ||
+                isJobRunning,
               hidden: isDlButtonsHidden
             }"
             @click="onBuildClicked"
@@ -717,7 +804,9 @@
             :class="{
               'dl-button': true,
               'mp4-2-button': true,
-              disabled: !isCurrentUserManager || isJobRunning,
+              disabled:
+                !(isCurrentUserManager || isCurrentUserSupervisor) ||
+                isJobRunning,
               hidden: isDlButtonsHidden
             }"
             @click="onBuildFullClicked"
@@ -750,11 +839,20 @@
               <span v-else-if="job.status === 'failed'">
                 {{ $t('playlists.failed') }}
               </span>
-              <a class="flexrow-item" :href="getBuildPath(job)" v-else>
-                {{ formatDate(job.created_at) }}
-              </a>
+              <template v-else>
+                <button
+                  class="job-button mr05"
+                  v-if="!joinedRoom"
+                  @click="playBuild(job)"
+                >
+                  <play-icon size="0.8x" />
+                </button>
+                <a class="flexrow-item" :href="getBuildPath(job)">
+                  {{ formatDate(job.created_at) }}
+                </a>
+              </template>
               <span class="filler"></span>
-              <button class="delete-job-button" @click="onRemoveBuildJob(job)">
+              <button class="job-button" @click="onRemoveBuildJob(job)">
                 x
               </button>
             </div>
@@ -765,6 +863,7 @@
           :title="$t('playlists.actions.download')"
           icon="download"
           @click="toggleDlButtons"
+          v-if="!isCurrentUserArtist"
         />
       </div>
 
@@ -802,6 +901,7 @@
           @play-click="entityListClicked"
           @remove-entity="removeEntity"
           @preview-changed="onPreviewChanged"
+          @entity-to-add="$emit('entity-to-add', $event)"
           @entity-dropped="onEntityDropped"
         />
       </div>
@@ -840,15 +940,22 @@
 import moment from 'moment-timezone'
 import WaveSurfer from 'wavesurfer.js'
 import { mapActions, mapGetters } from 'vuex'
-import { ArrowUpRightIcon, DownloadIcon } from 'vue-feather-icons'
+import {
+  ArrowUpRightIcon,
+  DownloadIcon,
+  GlobeIcon,
+  PlayIcon
+} from 'vue-feather-icons'
 
 import { formatFrame } from '@/lib/video'
 import ButtonSimple from '@/components/widgets/ButtonSimple'
 import ColorPicker from '@/components/widgets/ColorPicker'
 import Combobox from '@/components/widgets/Combobox'
+import ComboboxStyled from '@/components/widgets/ComboboxStyled'
 import DeleteModal from '@/components/modals/DeleteModal'
 import ObjectViewer from '@/components/previews/ObjectViewer'
 import PencilPicker from '@/components/widgets/PencilPicker'
+import PictureViewer from '@/components/previews/PictureViewer'
 import PlaylistedEntity from '@/components/pages/playlists/PlaylistedEntity'
 import RawVideoPlayer from '@/components/pages/playlists/RawVideoPlayer'
 import PreviewRoom from '@/components/widgets/PreviewRoom'
@@ -873,13 +980,17 @@ export default {
     ButtonSimple,
     ColorPicker,
     Combobox,
-    DownloadIcon,
+    ComboboxStyled,
     DeleteModal,
+    DownloadIcon,
+    GlobeIcon,
     ObjectViewer,
     PencilPicker,
+    PictureViewer,
+    PlayIcon,
     PlaylistedEntity,
-    RawVideoPlayer,
     PreviewRoom,
+    RawVideoPlayer,
     SelectTaskTypeModal,
     SoundViewer,
     Spinner,
@@ -904,9 +1015,9 @@ export default {
       type: Boolean,
       default: false
     },
-    isAssetPlaylist: {
-      type: Boolean,
-      default: false
+    currentEntityType: {
+      type: String,
+      default: 'shot'
     },
     tempMode: {
       type: Boolean,
@@ -919,17 +1030,28 @@ export default {
       buildLaunched: false,
       comparisonEntityMissing: false,
       comparisonMode: 'sidebyside',
+      currentBackground: null,
       currentComparisonPreviewIndex: 0,
       handleIn: 0,
       handleOut: 0,
       isAnnotationsDisplayed: true,
       isBuildLaunched: false,
       isDlButtonsHidden: true,
+      isEnvironmentSkybox: false,
+      isFullMode: false,
       isLaserModeOn: false,
+      isObjectBackground: false,
       isShowingPalette: false,
       isShowingPencilPalette: false,
       isShowAnnotationsWhilePlaying: false,
       isWaveformDisplayed: false,
+      isWireframe: false,
+      movieDimensions: { width: 0, height: 0 },
+      objectBackgroundUrl: null,
+      pictureDefaultHeight: 0,
+      playlistShotPosition: {},
+      playlistDuration: 0,
+      playlistProgress: 0,
       playlistToEdit: {},
       previewRoomRef: 'playlist-player-preview-room',
       revisionOptions: [],
@@ -966,41 +1088,47 @@ export default {
     } else {
       this.entityList = []
     }
-    if (this.picturePlayer) {
-      this.picturePlayer.addEventListener('load', async () => {
-        const wasPlaying = this.isPlaying
-        await this.resetPictureCanvas()
-        this.isPlaying = wasPlaying
-      })
-    }
+    this.resetPlaylistFrameData()
     this.$nextTick(() => {
       this.configureEvents()
       this.setupFabricCanvas()
       this.resetCanvas()
       this.setPlayerSpeed(1)
       this.rebuildComparisonOptions()
-      this.onFrameUpdate(1)
+      this.onFrameUpdate(0)
       this.configureWaveForm()
+      this.configureFullPlayer()
     })
+    this.currentBackground =
+      this.productionBackgrounds.find(this.isDefaultBackground) || null
+    this.onObjectBackgroundSelected()
   },
 
   computed: {
     ...mapGetters([
-      'assetTaskTypes',
       'currentEpisode',
       'currentProduction',
       'isCurrentUserArtist',
       'isCurrentUserClient',
       'isCurrentUserManager',
+      'isCurrentUserSupervisor',
       'isTVShow',
       'organisation',
       'previewFileMap',
+      'productionBackgrounds',
       'shotMap',
+      'productionAssetTaskTypes',
+      'productionSequenceTaskTypes',
+      'productionShotTaskTypes',
       'taskMap',
+      'taskStatusMap',
       'taskTypeMap',
-      'shotTaskTypes',
       'user'
     ]),
+
+    fullPlayer() {
+      return this.$refs['full-playlist-player']
+    },
 
     isMovieComparison() {
       if (!this.currentPreviewToCompare) return false
@@ -1118,18 +1246,30 @@ export default {
 
     entityTaskTypes() {
       if (this.playlist.for_entity === 'asset') {
-        return this.assetTaskTypes
+        return this.productionAssetTaskTypes
+      } else if (this.playlist.for_entity === 'shot') {
+        return this.productionShotTaskTypes
       } else {
-        return this.shotTaskTypes
+        return this.productionSequenceTaskTypes
       }
     },
 
     addEntitiesText() {
       if (this.isAssetPlaylist) {
         return this.$t('playlists.add_assets')
+      } else if (this.isSequencePlaylist) {
+        return this.$t('playlists.add_sequences')
       } else {
         return this.$t('playlists.add_shots')
       }
+    },
+
+    isAssetPlaylist() {
+      return this.currentEntityType === 'asset'
+    },
+
+    isSequencePlaylist() {
+      return this.currentEntityType === 'sequence'
     },
 
     isJobRunning() {
@@ -1137,6 +1277,28 @@ export default {
         this.playlist.build_jobs.filter(job => job.status === 'running')
           .length !== 0
       )
+    },
+
+    backgroundOptions() {
+      const defaultFlag = this.$t('playlists.actions.default')
+      return [
+        {
+          label: this.$t('playlists.actions.select_background'),
+          value: null,
+          placeholder: true
+        },
+        ...this.productionBackgrounds.map(background => ({
+          value: background,
+          label: background.name,
+          optionLabel:
+            background.name +
+            (this.isDefaultBackground(background) ? ` (${defaultFlag})` : '')
+        }))
+      ]
+    },
+
+    backgroundUrl() {
+      return this.isObjectBackground ? this.objectBackgroundUrl : undefined
     }
   },
 
@@ -1228,20 +1390,20 @@ export default {
       }, 1000)
     },
 
-    onPlayPreviousEntityClicked(forcePlay = false) {
+    onPlayPreviousEntityClicked() {
       this.clearFocus()
       this.playEntity(this.previousEntityIndex)
       this.sendUpdatePlayingStatus()
     },
 
-    onPlayNextEntity(forcePlay = false) {
+    onPlayNextEntity() {
       this.clearFocus()
       this.playEntity(this.nextEntityIndex)
       this.sendUpdatePlayingStatus()
     },
 
-    onPlayNextEntityClicked(forcePlay = false) {
-      this.onPlayNextEntity(forcePlay)
+    onPlayNextEntityClicked() {
+      this.onPlayNextEntity()
       this.sendUpdatePlayingStatus()
     },
 
@@ -1271,6 +1433,10 @@ export default {
           if (comparisonIndex !== entityIndex) {
             this.rawPlayerComparison.playNext()
           }
+        }
+        this.movieDimensions = {
+          width: this.currentPreview.width,
+          height: this.currentPreview.height
         }
       }
       if (!this.$options.silent) this.scrollToEntity(this.playingEntityIndex)
@@ -1309,6 +1475,13 @@ export default {
       }
     },
 
+    onVideoLoaded() {
+      this.movieDimensions = {
+        width: this.currentPreview.width,
+        height: this.currentPreview.height
+      }
+    },
+
     onPreviewChanged(entity, previewFile) {
       this.pause()
       const localEntity = this.entityList.find(s => s.id === entity.id)
@@ -1316,6 +1489,9 @@ export default {
       localEntity.preview_file_task_id = previewFile.task_id
       localEntity.preview_file_extension = previewFile.extension
       localEntity.preview_file_annotations = previewFile.annotations
+      localEntity.preview_file_width = previewFile.width
+      localEntity.preview_file_height = previewFile.height
+      localEntity.preview_file_duration = previewFile.duration
       localEntity.preview_file_previews = previewFile.previews
       localEntity.preview_file_revision = previewFile.revision
       if (this.rawPlayer) {
@@ -1334,19 +1510,30 @@ export default {
       this.updateTaskPanel()
     },
 
+    /*
+     * Called when an entity is dropped in the playlist. The entity is moved
+     * to the new position and the order of the entities is updated.
+     * @param {Object} info - {
+     *   before: where entity is dropped (id of the entity before),
+     *   after: the id of the entity dropped.
+     * }
+     */
     onEntityDropped(info) {
       const playlistEl = this.$refs['playlisted-entities']
       const scrollLeft = playlistEl.scrollLeft
-
       const entityToMove = this.entityList.find(s => s.id === info.after)
-      const toMoveIndex = this.entityList.findIndex(s => s.id === info.after)
-      let targetIndex = this.entityList.findIndex(s => s.id === info.before)
-      if (toMoveIndex > targetIndex) targetIndex += 1
-      this.moveSelectedEntity(entityToMove, toMoveIndex, targetIndex)
-      this.$nextTick(() => {
-        playlistEl.scrollLeft = scrollLeft
-      })
-      this.$emit('order-change', info)
+      if (!entityToMove) {
+        this.$emit('new-entity-dropped', info)
+      } else {
+        const toMoveIndex = this.entityList.findIndex(s => s.id === info.after)
+        let targetIndex = this.entityList.findIndex(s => s.id === info.before)
+        if (toMoveIndex > targetIndex) targetIndex += 1
+        this.moveSelectedEntity(entityToMove, toMoveIndex, targetIndex)
+        this.$nextTick(() => {
+          playlistEl.scrollLeft = scrollLeft
+        })
+        this.$emit('order-change', info)
+      }
     },
 
     moveSelectedEntityToLeft() {
@@ -1409,15 +1596,22 @@ export default {
         if (this.$refs['video-container']) {
           this.$refs['video-container'].style.height = `${height}px`
         }
-        if (!this.isCommentsHidden) {
+        if (this.$refs['task-info'] && !this.isCommentsHidden) {
           this.$refs['task-info'].$el.style.height = `${height}px`
         }
+        if (this.$refs['picture-preview-wrapper']) {
+          this.$refs['picture-preview-wrapper'].style.height = `${height}px`
+          this.pictureDefaultHeight = height
+        }
+        this.pictureDefaultHeight = height
+
+        if (this.$refs['full-playlist-player']) {
+          this.$refs['full-playlist-player'].style.height = height + 'px'
+        }
+
         if (this.rawPlayer) this.rawPlayer.resetHeight(height)
         if (this.isComparing && this.$refs['raw-player-comparison']) {
           this.$refs['raw-player-comparison'].resetHeight(height)
-          if (this.$refs['picture-preview-wrapper']) {
-            this.$refs['picture-preview-wrapper'].style.height = `${height}px`
-          }
         }
         this.$nextTick(() => {
           this.resetCanvas()
@@ -1552,6 +1746,28 @@ export default {
       this.isDlButtonsHidden = !this.isDlButtonsHidden
     },
 
+    onPictureLoaded() {
+      this.$nextTick(async () => {
+        this.resetCanvasSize()
+        const wasPlaying = this.isPlaying
+        await this.resetPictureCanvas()
+        this.isPlaying = wasPlaying
+      })
+    },
+
+    onObjectBackgroundSelected() {
+      this.objectBackgroundUrl = this.currentBackground?.url
+      const enabled = Boolean(this.objectBackgroundUrl)
+      this.isObjectBackground = enabled
+      this.isEnvironmentSkybox = enabled
+    },
+
+    isDefaultBackground(background) {
+      const defaultId =
+        this.currentProduction.default_preview_background_file_id
+      return defaultId ? background.id === defaultId : background.is_default
+    },
+
     onBuildClicked() {
       this.runBuild(false)
     },
@@ -1562,7 +1778,7 @@ export default {
 
     runBuild(full = false) {
       if (
-        this.isCurrentUserManager &&
+        (this.isCurrentUserManager || this.isCurrentUserSupervisor) &&
         !this.isJobRunning &&
         !this.isBuildLaunched
       ) {
@@ -1572,6 +1788,28 @@ export default {
             this.isBuildLaunched = false
           })
           .catch(console.error)
+      }
+    },
+
+    playBuild(job) {
+      this.isFullMode = true
+      const path = this.getBuildPath(job)
+      if (this.$options.fullPlayingPath !== path) {
+        this.$options.fullPlayingPath = path
+        this.fullPlayer.src = path
+        this.fullPlayer.currentTime = 0
+        this.setPlaylistProgress(0)
+      }
+    },
+
+    setPlaylistProgress(time) {
+      this.playlistProgress = time
+      const frame = Math.round(this.playlistProgress * this.fps)
+      if (this.playlistShotPosition[frame]) {
+        const entityIndex = this.playlistShotPosition[frame].index
+        if (entityIndex !== this.playingEntityIndex && entityIndex) {
+          this.playEntity(entityIndex)
+        }
       }
     },
 
@@ -1591,6 +1829,15 @@ export default {
     confirmChangeTaskType(taskTypeId) {
       this.$emit('task-type-changed', taskTypeId)
       this.modals.taskType = false
+    },
+
+    configureFullPlayer() {
+      this.fullPlayer.addEventListener('loadedmetadata', () => {
+        this.playlistDuration = this.fullPlayer.duration
+      })
+      this.fullPlayer.addEventListener('ended', () => {
+        this.pause()
+      })
     },
 
     onPreviousPreviewClicked() {
@@ -1640,8 +1887,30 @@ export default {
     },
 
     onEntitiesWheel(event) {
-      event.preventDefault()
-      this.$refs['playlisted-entities'].scrollLeft += event.deltaY
+      const isMouseWheelY = !event.deltaX
+      if (isMouseWheelY) {
+        event.preventDefault()
+        this.$refs['playlisted-entities'].scrollLeft += event.deltaY
+      }
+    },
+
+    onProgressPlaylistChanged(frameNumber) {
+      if (this.isFullMode) {
+        const time = frameNumber / this.fps
+        this.fullPlayer.currentTime = time
+        this.playlistProgress = time
+      }
+      const { index, start } = this.playlistShotPosition[frameNumber]
+      const frame = (frameNumber / this.fps - start) * this.fps + 1
+      if (index !== this.playingEntityIndex) {
+        this.$nextTick(() => {
+          this.playEntity(index, false, frame)
+          this.onFrameUpdate(frame)
+        })
+      } else {
+        // this.onFrameUpdate(frame)
+        this.setCurrentTimeRaw(frame / this.fps)
+      }
     },
 
     saveUserComparisonChoice() {
@@ -1650,19 +1919,23 @@ export default {
     },
 
     configureWaveForm() {
-      this.wavesurfer = WaveSurfer.create({
-        container: '#waveform',
-        waveColor: '#00B242', // green
-        progressColor: '#008732', // dark-green,
-        height: 60,
-        responsive: true,
-        fillParent: true,
-        minPxPerSec: 1,
-        backend: 'MediaElement'
-      })
-      this.wavesurfer.on('seek', position => {
-        this.setCurrentTimeRaw(this.maxDurationRaw * position)
-      })
+      try {
+        this.wavesurfer = WaveSurfer.create({
+          container: '#waveform',
+          waveColor: '#00B242', // green
+          progressColor: '#008732', // dark-green,
+          height: 60,
+          responsive: true,
+          fillParent: true,
+          minPxPerSec: 1,
+          backend: 'MediaElement'
+        })
+        this.wavesurfer.on('seek', position => {
+          this.setCurrentTimeRaw(this.maxDurationRaw * position)
+        })
+      } catch (err) {
+        console.error(err)
+      }
     },
 
     loadWaveForm() {
@@ -1675,6 +1948,10 @@ export default {
       if (this.progress) {
         this.progress.updateProgressBar(this.frameNumber + 1)
       }
+      if (this.playlistDuration && !this.isFullMode && this.currentEntity) {
+        this.playlistProgress =
+          this.currentEntity.start_duration + this.frameNumber / this.fps
+      }
     },
 
     resetHandles(entity) {
@@ -1684,13 +1961,58 @@ export default {
         this.handleIn = shot.data.handle_in || 0
         this.handleOut = shot.data.handle_out || this.nbFrames
       }
+    },
+
+    resetPlaylistFrameData() {
+      let playlistDuration = 0
+      let currentFrame = 0
+      this.entityList.forEach((entity, index) => {
+        this.framesPerImage[index] =
+          entity.preview_nb_frames || DEFAULT_NB_FRAMES_PICTURE
+        const nbFrames = Math.round(
+          (entity.preview_file_duration || 0) * this.fps
+        )
+        entity.start_duration = (currentFrame + 1) / this.fps
+        for (let i = 0; i < nbFrames; i++) {
+          this.playlistShotPosition[currentFrame + i] = {
+            index,
+            name: entity.name,
+            start: entity.start_duration,
+            id: entity.preview_file_id
+          }
+        }
+        currentFrame += nbFrames
+        playlistDuration += nbFrames / this.fps
+
+        const taskId = entity.preview_file_task_id
+        const task = this.taskMap.get(taskId)
+        if (task) {
+          const taskStatus = this.taskStatusMap.get(task.task_status_id)
+          entity.task_status_color = taskStatus.color
+        }
+      })
+      this.playlistDuration = playlistDuration
+      return playlistDuration
+    },
+
+    onRawPlayerFrameUpdate(frame) {
+      if (!this.isFullMode) {
+        this.onFrameUpdate(frame)
+      }
     }
   },
 
   watch: {
+    isLoading() {
+      if (!this.isLoading) {
+        this.resetHeight()
+      }
+    },
+
     currentPreviewIndex() {
       this.endAnnotationSaving()
       this.resetUndoStacks()
+      this.resetHeight()
       this.$nextTick(() => {
         if (this.isCurrentPreviewPicture) {
           this.resetPictureCanvas()
@@ -1698,6 +2020,10 @@ export default {
           this.resetCanvas()
         }
       })
+      this.movieDimensions = {
+        width: this.currentPreview.width,
+        height: this.currentPreview.height
+      }
     },
 
     playingEntityIndex() {
@@ -1714,6 +2040,10 @@ export default {
       }
       if (this.currentEntity) {
         this.annotations = this.currentEntity.preview_file_annotations || []
+        this.movieDimensions = {
+          width: this.currentPreview.width,
+          height: this.currentPreview.height
+        }
       }
       this.$nextTick(() => {
         if (this.isComparing) {
@@ -1730,6 +2060,10 @@ export default {
       })
     },
 
+    fullScreen() {
+      this.resetHeight()
+    },
+
     isComparing() {
       if (this.isComparing) {
         this.pause()
@@ -1737,8 +2071,10 @@ export default {
         this.rebuildEntityListToCompare()
       }
       this.$nextTick().then(() => {
+        window.dispatchEvent(new Event('resize'))
         this.resetPictureCanvas()
         this.resetCanvas()
+        this.syncComparisonPlayer()
         this.reloadAnnotations()
       })
     },
@@ -1755,19 +2091,21 @@ export default {
       this.currentPreviewIndex = 0
       this.currentComparisonPreviewuIndex = 0
       this.entityList = Object.values(this.entities)
-      this.entityList.forEach((entity, i) => {
-        this.framesPerImage[i] =
-          entity.preview_nb_frames || DEFAULT_NB_FRAMES_PICTURE
-      })
+      this.resetPlaylistFrameData()
+
       this.playingEntityIndex = 0
       this.pause()
-      if (this.rawPlayer) this.rawPlayer.setCurrentFrame(1)
+      if (this.rawPlayer) this.rawPlayer.setCurrentFrame(0)
       this.currentTimeRaw = 0
       this.updateProgressBar()
       this.updateTaskPanel()
       this.rebuildComparisonOptions()
       this.clearCanvas()
       this.annotations = []
+      this.movieDimensions = {
+        width: 0,
+        height: 0
+      }
       this.isComparing = false
       if (this.entityList.length === 0) {
         this.clearPlayer()
@@ -1776,6 +2114,10 @@ export default {
       this.resetCanvas().then(() => {
         if (this.isCurrentPreview) {
           this.resetHandles()
+          this.movieDimensions = {
+            width: this.currentPreview.width,
+            height: this.currentPreview.height
+          }
           this.annotations = this.currentEntity.preview_file_annotations
           this.loadAnnotation(this.getAnnotation(0))
         }
@@ -1788,6 +2130,14 @@ export default {
       this.$nextTick(() => {
         this.updateProgressBar()
         this.clearCanvas()
+        this.$nextTick(() => {
+          if (this.currentPreview) {
+            this.movieDimensions = {
+              width: this.currentPreview.width,
+              height: this.currentPreview.height
+            }
+          }
+        })
       })
     },
 
@@ -1812,6 +2162,18 @@ export default {
 
     isLaserModeOn() {
       this.updateRoomStatus()
+    },
+
+    isFullMode() {
+      this.isComparing = false
+      if (this.isFullMode) {
+        this.$nextTick(() => {
+          this.playEntity(0)
+        })
+      } else {
+        this.$options.fullPlayingPath = ''
+        this.onFrameUpdate(0)
+      }
     }
   },
 
@@ -1860,9 +2222,12 @@ export default {
     border: 0;
     border-radius: 0;
     color: var(--text);
+    transition: all 0.3s ease;
 
     &:hover {
       background: var(--background-tag-button);
+      border-radius: 5px;
+      // transform: scale(1.2);
     }
 
     &.active {
@@ -1889,7 +2254,7 @@ export default {
 
 .playlist-footer {
   width: 100%;
-  min-height: 32px;
+  height: 32px;
   padding-right: 5px;
 }
 
@@ -1975,17 +2340,26 @@ export default {
   top: 0;
   left: 0;
 }
-
-.buttons {
-  height: 32px;
-}
-
 .comparison-combobox {
   margin-bottom: 0;
 }
 
-.buttons .comparison-button {
-  margin-left: 1em;
+.playlist-footer .background-combo {
+  max-width: 300px;
+
+  :deep(.combo) {
+    max-width: 100%;
+  }
+  .icon {
+    height: 1rem;
+    margin-top: 0;
+  }
+}
+
+.playlist-footer .button.active,
+.playlist-footer .button:hover,
+.playlist-footer .background-combo.active .icon {
+  color: #43b581;
 }
 
 progress::-moz-progress-bar {
@@ -2065,7 +2439,7 @@ progress {
   background: $dark-grey;
   border: 1px solid $dark-grey-light;
   position: absolute;
-  width: 190px;
+  width: 200px;
   left: -120px;
   top: -280px;
   height: 160px;
@@ -2076,7 +2450,7 @@ progress {
   background: $dark-grey-stronger;
   border: 1px solid $dark-grey-light;
   position: absolute;
-  width: 190px;
+  width: 200px;
   left: -120px;
   top: -121px;
   height: 120px;
@@ -2089,9 +2463,10 @@ progress {
   margin-bottom: 0.5em;
 }
 
-.delete-job-button {
+.job-button {
   background: transparent;
   border-radius: 50%;
+  width: 22px;
   color: $light-grey-light;
   cursor: pointer;
   padding: 3px;
@@ -2148,12 +2523,17 @@ progress {
   margin-right: 0;
 }
 
+.canvas-wrapper {
+  z-index: 5;
+}
+
 .picture-preview-wrapper {
   display: flex;
   height: inherit;
   justify-content: center;
   align-items: center;
   flex: 1;
+  z-index: 3;
 }
 
 .picture-preview-comparison-wrapper {
@@ -2162,6 +2542,7 @@ progress {
   justify-content: center;
   align-items: center;
   flex: 1;
+  z-index: 1;
 }
 
 .picture-preview {
@@ -2193,14 +2574,6 @@ progress {
   position: relative;
 }
 
-.comparison-combos {
-  /*
-  position: absolute;
-  top: 33px;
-  z-index: 50;
-  */
-}
-
 .comparison-index {
   min-width: 30px;
   margin: 0;
@@ -2223,9 +2596,11 @@ input[type='number'] {
 
 .frame-per-image-input {
   padding: 2px;
-  margin-left: 3px;
+  margin-left: 4px;
+  padding-left: 5px;
   background-color: $dark-grey-2;
   border: 1px solid $dark-grey-stronger;
+  border-radius: 5px;
   color: white;
   width: 3rem;
 }
@@ -2233,6 +2608,15 @@ input[type='number'] {
 #resize-annotation-canvas,
 #annotation-snapshot {
   display: none;
+}
+
+.video-time {
+  position: absolute;
+  background: black;
+  color: white;
+  top: 0;
+  left: 0;
+  z-index: 100000;
 }
 
 @media only screen and (min-width: 1600px) {

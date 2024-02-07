@@ -6,17 +6,19 @@ export default {
     delete_error: 'An error occurred while deleting this asset. There are probably data linked to it. Are you sure this asset type has no task linked to it?',
     delete_for_selection: 'Delete the selected asset | Delete the {nbSelectedAssets} selected assets',
     delete_text: 'Are you sure you want to remove {name} from your database?',
-    edit_fail: 'Saving failed, it may be due to the fact that an asset with a similar name already exists.',
+    edit_fail: 'Saving failed, it may be because an asset with a similar name already exists.',
     edit_success: 'Asset {name} successfully edited.',
     edit_title: 'Edit asset',
     empty_list: 'There is no asset in the production. What about creating some?',
     empty_list_client: 'There is no asset in this production.',
+    linked: 'Linked',
     multiple_delete_error: 'An error occurred while deleting an asset. There is probably some data linked to an asset. Are you sure there is no task linked to a selected asset?',
     only_current_episode: 'Only current episode',
     new_asset: 'Create assets',
     new_assets: 'Create assets',
     new_success: 'Asset {name} successfully created.',
     no_cast_in: 'This asset is not cast in any shot.',
+    no_concept: 'No concepts linked to this asset',
     number: 'asset | assets',
     restore_text: 'Are you sure you want to restore {name} from your archive?',
     restore_error: 'An error occurred while restoring this asset.',
@@ -36,7 +38,7 @@ export default {
 
   asset_types: {
     all_asset_types: 'All asset types',
-    create_error: 'An error occurred while saving this asset type. Are you sure there is no asset type with similar name?',
+    create_error: 'An error occurred while saving this asset type. Are you sure there is no asset type with a similar name?',
     delete_text: 'Are you sure you want to remove {name} from your database?',
     delete_error: 'An error occurred while deleting this asset type. There are probably data linked to it. Are you sure this asset type has no asset linked to it?',
     edit_title: 'Edit asset type',
@@ -48,6 +50,33 @@ export default {
     fields: {
       name: 'Name',
       task_types: 'Workflow'
+    }
+  },
+
+  backgrounds: {
+    create_error: 'An error occurred while saving this background. Are you sure there is no background with a similar name?',
+    delete_text: 'Are you sure you want to remove {name} from your database?',
+    delete_error: 'An error occurred while deleting this background. There are probably data linked to it. Are you sure this background has no task linked to it?',
+    name: 'background',
+    number: 'background | backgrounds',
+    edit_background: 'Edit background',
+    new_background: 'Add a new background',
+    title: '3D Backgrounds',
+    fields: {
+      is_default: 'Is default',
+      name: 'Name',
+      file: 'HDRi File'
+    }
+  },
+
+  board: {
+    title: 'Board',
+    empty: 'Your kanban board is currently empty. It means no task status is configured for your user role in the production settings.',
+    settings: {
+      title: 'Board Status',
+      visible: 'Displayed on kanban board of...',
+      select_all: 'Select all',
+      unselect_all: 'Unselect all'
     }
   },
 
@@ -84,10 +113,12 @@ export default {
     attachments_to_add: 'Add attachments',
     checklist: 'Checklist',
     change_preview: 'Change preview',
+    confirm_publish: 'There is no preview files set for publishing. Are you sure you want to publish your comment?',
+    confirm_publish_button: 'Post comment without publishing files',
     comment_from_client: 'Comment from client',
     edit_title: 'Edit comment',
     empty_text: 'This comment is empty',
-    edit_error: 'An error occurred while editing comment. Please contact our support team.',
+    edit_error: 'An error occurred while editing the comment. Please contact our support team.',
     error: 'An error occurred while posting comment',
     max_retakes_error: 'You cannot add retakes anymore on this task.',
     no_attachments: 'There are no attachments for this comment.',
@@ -115,10 +146,33 @@ export default {
     }
   },
 
+  concepts: {
+    add_links: 'Add links to assets',
+    add_new_concept: 'Add new concepts',
+    add_concept: 'Add files for new concepts',
+    add_concept_error: 'An error occurred while adding concept.',
+    delete_for_selection: 'Delete the selected concept | Delete the {nbSelectedConcepts} selected concepts',
+    empty: 'There are no concept for this production',
+    multiple_delete_error: 'An error occurred while deleting a concept. There is probably some data linked to a concept. Are you sure there is no task linked to a selected concept?',
+    no_concept_selected: 'No concept selected',
+    title: 'Concepts',
+    fields: {
+      entity_type: 'Entity type',
+      created_at: 'Creation date',
+      updated_at: 'Update date',
+      last_comment_date: 'Last comment',
+      publisher: 'Publish by'
+    },
+    actions: {
+      title: 'Links to Concept',
+      empty: 'No links'
+    }
+  },
+
   custom_actions: {
-    create_error: 'An error occurred while saving this custom custom action. Are you sure that there is no other action with the same name?',
+    create_error: 'An error occurred while saving this custom action. Are you sure that there is no other action with the same name?',
     delete_text: 'Are you sure you want to remove custom action {name} from your database?',
-    delete_error: 'An error occurred while deleting this custom custom action.',
+    delete_error: 'An error occurred while deleting this custom action.',
     edit_title: 'Edit a custom action',
     new_custom_action: 'Add a custom action',
     number: 'custom action | custom actions',
@@ -150,8 +204,8 @@ export default {
     out_title: 'The change that will be applied on trigger firing',
     new_status_automation: 'Add status automation',
     run_for_selection: 'Run status automation for selected tasks:',
-    title: 'Status Automations',
-    wrong_automation: 'This automation applies on a backward task type. It is not permitted by Kitsu (to avoid cycles). It will have no effect.',
+    title: 'Automations',
+    wrong_automation: 'This automation applies to a backward task type. It is not permitted by Kitsu (to avoid cycles). It will have no effect.',
     fields: {
       entity_type: 'Entity Type',
       in_field_type: 'Input Field Type',
@@ -173,10 +227,11 @@ export default {
 
   departments: {
     all_asset_types: 'All departments',
-    create_error: 'An error occurred while saving this department. Are you sure there is no department with similar name?',
+    create_error: 'An error occurred while saving this department. Are you sure there is no department with a similar name?',
     delete_text: 'Are you sure you want to remove {name} from your database?',
     delete_error: 'An error occurred while deleting this department.',
     edit_title: 'Edit department',
+    no_department: 'No department',
     new_departments: 'Add a department',
     number: 'department | departments',
     title: 'Departments',
@@ -190,8 +245,8 @@ export default {
     build_filter: {
       asset_type: 'Asset type',
       all_types: 'All asset types',
-      assignation: 'Assignation',
-      assignation_exists_for: 'Assignations exists for',
+      assignation: 'Assignment',
+      assignation_exists_for: 'Assignments exists for',
       assigned_to: 'Assigned to',
       department: 'Department',
       descriptor: 'Metadata',
@@ -200,7 +255,7 @@ export default {
       is_assets_ready: 'Assets are ready',
       assets_ready: 'Ready',
       assets_not_ready: 'Not ready',
-      no_assignation_for: 'No assignation exists for',
+      no_assignation_for: 'No assignment exists for',
       no_filter: 'No filter',
       not_equal: 'Not equal',
       not_assigned_to: 'Not assigned to',
@@ -236,14 +291,16 @@ export default {
     },
 
     thumbnails: {
+      assets_pattern: '"AssetType AssetName" eg. Environment_Forest.',
+      edits_pattern: '"EditName" eg. Trailer.',
+      edits_tvshow_pattern: '"EpisodeName EditName" eg. E01_Trailer.',
       error: 'An error occurred while uploading thumbnails',
       explaination: 'Adding a thumbnail requires to set a new preview. In order to set several thumbnails at the same time, you must choose first a task type that will be used to create the new previews. The thumbnails will be set from this new preview.',
       explaination_two: 'Then you have to select the files you want to upload. To find the right entities, the file names must match the following pattern:',
-      shots_pattern: '"SequenceName ShotName" eg. SQ01_SH01.',
-      assets_pattern: '"AssetType AssetName" eg. Environment_Forest.',
       select_files: 'Select Files',
       selected_files: 'Selected Files',
       select_task_type: 'Select Task Type',
+      shots_pattern: '"SequenceName ShotName" eg. SQ01_SH01.',
       title: 'Add Thumbnails',
       undefined: 'Undefined',
       undefined_pattern: 'Undefined',
@@ -272,7 +329,8 @@ export default {
     stats_title: 'Episodes Stats',
     fields: {
       name: 'name',
-      description: 'description'
+      description: 'description',
+      placeholder: 'E01'
     },
     status: {
       'canceled': 'Canceled',
@@ -284,8 +342,8 @@ export default {
 
   keyboard: {
     altdown: 'Move task selection down',
-    altj: 'Select previous preview',
-    altk: 'Select next preview',
+    altj: 'Select the previous preview',
+    altk: 'Select the next preview',
     altleft: 'Move task selection left',
     altright: 'Move task selection right',
     altup: 'Move task selection up',
@@ -303,6 +361,19 @@ export default {
     shortcuts: 'Shortcuts'
   },
 
+  intro: {
+    main: 'To make our project thrive, we need your support. To help us, we propose you simple contributions:',
+    first: 'Star our repository on ',
+    second: 'Follow us on ',
+    third: 'Join our',
+    four: 'Suggest new features on ',
+    five: 'Donate to our ',
+    six: 'Have a look at our cloud and on-premise ',
+    seven: 'Share Kitsu with your friends and colleagues',
+    eight: 'Thank you for your help!',
+    title: 'How to support Kitsu'
+  },
+
   login: {
     back_to_login: 'Go back to login page',
     choose_totp: 'Enter two-factor authentication code via TOTP',
@@ -311,16 +382,17 @@ export default {
     choose_recovery_code: 'Use a recovery code',
     error_requesting_fido: 'An error occurred while requesting FIDO challenge.',
     error_sending_email: 'An error occurred while sending OTP via email.',
-    first_connection: 'For your first connection, we need you to set up a password. For that you have to run the reset password procedure.',
+    first_connection: 'For your first connection, we need you to set up a password. For that, you have to run the reset password procedure.',
     first_connection_2: 'Please, give us the email used for your Kitsu account and we will send you the reset password link.',
     first_connection_title: 'Welcome to Kitsu!',
     forgot_password: 'Forgot password?',
     information_totp: 'Open the two-factor authenticator (TOTP) app on your mobile device to view your authentication code.',
-    information_fido: 'Plug your FIDO device to your computer.',
+    information_fido: 'Plug your FIDO device into your computer.',
     information_email_otp: 'Check your emails to view your authentication code.',
-    information_recovery_code: 'If you are unable to use any other two factor authentication, enter one of your recovery codes to verify your identity.',
+    information_recovery_code: 'If you are unable to use any other two-factor authentication, enter one of your recovery codes to verify your identity.',
     login: 'Log in',
-    login_failed: 'Log in failed, please verify your credentials.',
+    login_failed: 'Login failed, please verify your credentials.',
+    login_server_failed: 'A server error occurred while logging in.',
     login_page: 'Cancel',
     redirecting: 'Redirecting in {secondsLeft} seconds...',
     reset_change_password: 'Change password',
@@ -329,7 +401,7 @@ export default {
     reset_change_password_succeed: 'Your password was changed successfully. Please, go back to the login page to use it.',
     reset_change_password_title: 'Enter a new password',
     reset_password: 'Reset Password',
-    reset_password_failed: 'Resetting you password failed. Please verify your email.',
+    reset_password_failed: 'Resetting your password failed. Please verify your email.',
     reset_password_succeed: 'Resetting your password succeeded. Please check your inbox.',
     reset_password_title: 'Enter your email to reset your password',
     retry_fido_challenge: 'Retry FIDO challenge',
@@ -357,15 +429,16 @@ export default {
 
   logs: {
     current_date_label: 'Show logs for',
-    empty_list: 'There is no logs for the selected date.',
+    empty_list: 'There are no logs for the selected date.',
     events: 'events listed for the current day',
     title: 'Logs',
     preview_files: {
       date: 'Creation date',
-      empty_list: 'There is no broken or ongoing previews.',
+      empty_list: 'There are no broken or ongoing previews.',
       entity_name: 'Entity name',
-      explaination: 'This page lists all the preview files in an intermediary state: processing or broken. It lets you know how much preview files are processing or which files failed to be normalized and stored on Kitsu.',
+      explaination: 'This page lists all the preview files in an intermediary state: processing or broken. It lets you know how many preview files are processing or which files failed to be normalized and stored on Kitsu.',
       file_name: 'File name',
+      mark_broken: 'Mark as broken',
       person: 'User',
       production: 'Production',
       revision: 'Revision',
@@ -377,18 +450,26 @@ export default {
 
   main: {
     about: 'About',
+    active: 'Active',
+    activity: 'Activity',
     add: 'add',
+    after: 'After',
+    admin: 'Admin',
     all: 'All',
     all_assets: 'All assets',
     all_edits: 'All edits',
     all_shots: 'All shots',
-    admin: 'Admin',
-    after: 'After',
+    archived: 'Archived',
     attach_snapshots: 'Attach snapshots from your annotation',
+    avatar: {
+      open_page: 'Open {personName} page',
+      unassign: 'Unassign {personName}'
+    },
     before: 'Before',
     cancel: 'Cancel',
     clear_selection: 'Clear current selection',
     close: 'Close',
+    color: 'Color',
     column_visibility: 'Visible columns',
     confirmation: 'Confirm',
     confirmation_and_stay: 'Confirm and stay',
@@ -399,6 +480,7 @@ export default {
     delete: 'Delete',
     delete_all: 'Delete all',
     delete_text: 'Are you sure you want to remove {name} from your database?',
+    department: 'Department',
     documentation: 'Documentation',
     edit: 'Edit',
     empty_comment: 'Empty comment',
@@ -407,6 +489,11 @@ export default {
     estimation: 'Estimation',
     estimation_short: 'Est.',
     files_selected: 'files selected',
+    filter_group: 'Filter Group',
+    filter_group_add: 'Add A Filter Group',
+    filter_group_edit: 'Edit A Filter Group',
+    filter_group_empty: 'No filter',
+    filter_group_error: 'An error occurred while saving this filter group.',
     for: 'For',
     fps: 'FPS',
     frames: 'Frames',
@@ -420,7 +507,8 @@ export default {
     home: 'return to home page',
     or: 'or',
     no: 'No',
-    less_filters: 'Less filters',
+    less_filters: 'Fewer filters',
+    load_more: 'Load more',
     loading: 'Loading...',
     loading_data: 'Loading data',
     loading_error: 'An error occurred while loading data.',
@@ -433,6 +521,7 @@ export default {
     more_filters: 'More filters',
     move_action_bar: 'Move action bar',
     nb_frames: 'frame | frames',
+    on: 'On',
     person: 'Person',
     profile: 'Profile',
     production: 'Production',
@@ -454,6 +543,7 @@ export default {
     stick: 'Stick',
     studio: 'Studio',
     status: 'Status',
+    tasks: 'Tasks',
     to: 'To',
     timeSpent: 'Time Spent',
     tutorials: 'Tutorials',
@@ -476,22 +566,24 @@ export default {
       import_file: 'Import',
       import_title: 'Import data from CSV',
       legend: 'Legend',
-      legend_ok: 'Recognized data',
-      legend_ignored: 'Ignored data',
-      legend_missing: 'Missing data',
-      legend_disabled: 'Data that will no be updated or created',
-      legend_overwrite: 'Data that will be updated',
+      legend_ok: 'Column that will be imported',
+      legend_line_ok: 'Line that will be created',
+      legend_ignored: 'Column that was not matched and will not be imported',
+      legend_missing: 'Expected column that was not found',
+      legend_missing_optional: 'Optional column that was not found',
+      legend_disabled: 'Line that will not be updated or created',
+      legend_overwrite: 'Line that will be updated',
       paste: 'Paste',
       paste_code: 'Please paste here your CSV data:',
       preview: 'Preview',
       preview_episode_name: 'Episode name',
       preview_title: 'Preview of your imported data',
-      preview_description: 'Upload a .csv file to populate your board with posts.',
-      preview_required: 'NB: Headers must be included as first row.',
+      preview_description: 'Upload a .csv file to populate your entity table.',
+      preview_required: 'Headers are used to match columns with the data to set. They must be included as the first row.',
       preview_reupload: 'Reupload .CSV file',
       required_fields: 'Your CSV requires the following columns:',
-      optional_fields: 'Optional columns:',
-      generic_fields: 'Generic columns:',
+      optional_fields: 'Descriptive columns (optional):',
+      generic_fields: 'Metadata and task columns (optional):',
       select_file: 'Please select a file from one of your folder:',
       tab_select_file: 'Upload a CSV file',
       tab_paste_code: 'Paste a CSV data',
@@ -520,13 +612,20 @@ export default {
     change_status: 'Change status',
     create_tasks: 'Create tasks',
     delete_assets: 'Delete assets',
-    delete_shots: 'Delete shots',
+    delete_concepts: 'Delete concepts',
     delete_edits: 'Delete edits',
+    delete_shots: 'Delete shots',
     delete_tasks: 'Delete tasks',
+    edit_concepts: 'Edit concept links',
     generate_playlist: 'Generate a playlist',
     run_custom_action: 'Run custom action',
     set_estimations: 'Set estimations',
-    set_thumbnails: 'Set thumbnails from last preview'
+    set_thumbnails: 'Set thumbnails from last preview',
+    subscribe: 'Subscribe to notifications'
+  },
+
+  my_checks : {
+    title: 'Task to check | Tasks to check'
   },
 
   news: {
@@ -537,7 +636,7 @@ export default {
     only_previews: 'Only previews',
     hide_stats: 'Hide stats',
     news: 'news',
-    no_news: 'There are no news for this entity.',
+    no_news: 'There is no news.',
     set_preview_on: 'set preview on',
     show_stats: 'Show stats',
     task_status: 'Task status',
@@ -546,8 +645,8 @@ export default {
   },
 
   not_found: {
-    text: 'There was something wrong with the link you clicked on, we encourage you to come back on the home page.',
-    title: 'Page not found... are your looking for something you deleted?'
+    text: 'There was something wrong with the link you clicked on, the target was not found. We encourage you to come back to the home page.',
+    title: 'Page not found...'
   },
 
   notifications: {
@@ -558,7 +657,7 @@ export default {
     mention_you_on: 'mentioned you on',
     new_revision: 'New revision published',
     no_notifications: 'There is currently no notification for you for your current projects.',
-    only_assignations: 'Only assignations',
+    only_assignations: 'Only assignments',
     only_comments: 'Only comments',
     only_mentions: 'Only mentions',
     only_replies: 'Only replies',
@@ -575,9 +674,10 @@ export default {
     confirm_edit: 'Save user changes',
     create: 'Create user',
     create_invite: 'Create user and send invitation',
-    create_error: 'A server error occurred while creating or update this user. Please contact our support team for more information.',
-    delete_error: 'An error occurred while deleting this user. There are probably data linked to it. Are you sure this user has no assignation or wrote no comment?',
-    delete_text: 'Are you sure you want to remove {personName} from your database? Every related comments and previews will be deleted. Please confirm by typing the full user name below.',
+    create_error: 'A server error occurred while creating or updating this user. Please contact our support team for more information.',
+    delete_error: 'An error occurred while deleting this user. There are probably data linked to it. Are you sure this user has no assignments or wrote no comment?',
+    delete_text: 'Are you sure you want to remove {personName} from your database? Every related comment and preview will be deleted. Please confirm by typing the full user name below.',
+    departments_empty: 'This is user isn\'t linked to any department.',
     edit_title: 'Edit user',
     empty_team: 'There is no one listed in the project team.',
     invite: 'Send an invitation',
@@ -590,12 +690,12 @@ export default {
     select_person: 'Select a user...',
     team: 'Team',
     title: 'People',
-    unactive: 'Unactive',
-    user_limit_error: 'You have reach your user limit. Please contact our team to upgrade your plan.',
+    unactive: 'Inactive',
+    user_limit_error: 'You have reached your user limit. Please contact our team to upgrade your plan.',
     change_password_for: 'Change password for',
     change_password_error: 'An error occurred while changing password. Please verify the new password.',
     disable_2FA: 'Disable 2FA',
-    disable_2FA_error: 'An error occurred while disabling two factor authentication.',
+    disable_2FA_error: 'An error occurred while disabling two-factor authentication.',
     fields: {
       active: 'Active',
       departments: 'Departments',
@@ -617,6 +717,7 @@ export default {
       role: 'Role'
     },
     role: {
+      all: 'All',
       admin: 'Studio Manager',
       client: 'Client',
       manager: 'Production Manager',
@@ -635,11 +736,12 @@ export default {
   playlists: {
     add_assets: 'Add assets',
     add_selection: 'Add selection',
+    add_sequences: 'Add sequences',
     add_shots: 'Add shots',
-    add_sequence: 'Add whole sequence',
-    add_episode: 'Add whole episode',
-    add_movie: 'Add whole movie',
-    apply_task_type_change: 'This will set the last revision for given task type on all shots.',
+    add_sequence: 'Add the whole sequence',
+    add_episode: 'Add the whole episode',
+    add_movie: 'Add the whole movie',
+    apply_task_type_change: 'This will set the last revision for the given task type on all entities.',
     available_build: 'Available builds',
     build_daily: 'Daily pending',
     build_weekly: 'All Pending',
@@ -672,7 +774,7 @@ export default {
     no_shot_for_production: 'There is no shot for this production',
     select_shot: 'Please select a shot in the right column',
     select_playlist: 'Please select a playlist in the left column',
-    select_task_type: 'Change task type for all shots',
+    select_task_type: 'Change task type for all entities',
     title: 'Playlists',
     updated_at: 'Updated at:',
     remove: 'remove',
@@ -694,25 +796,28 @@ export default {
       annotation_big: 'Big',
       annotation_medium: 'Medium',
       annotation_small: 'Small',
+      annotation_zoom_pan: 'Enable zoom and pan',
       change_task_type: 'Change task type',
       current_time: 'Position in the video',
       comments: 'Show/Hide comments',
       delete: 'Delete playlist',
       display_revision: 'Display revision',
+      default: 'default',
       download: 'Download playlist',
       download_file: 'Download file',
       edit: 'Edit playlist',
       entity_list: 'Show/Hide entity list',
-      entity_index: 'Index of current entity in the playlist',
+      entity_index: 'Index of the current entity in the playlist',
       entities_number: 'Number of entities in the playlist',
       frame_number: 'Frame number',
       files_add: 'Add a file to the revision',
-      files_delete: 'Delete and remove file from the revision',
+      files_delete: 'Delete and remove the file from the revision',
       files_next: 'Next file for this revision',
       files_position: 'File index for this revision',
       files_previous: 'Previous file for this revision',
       frames_per_picture: 'Frames per picture',
       fullscreen: 'See file in full screen',
+      object_background: 'Set a new environment map to the 3D model',
       looping: 'Loop on current video',
       mute: 'Mute',
       overlay: 'Overlay',
@@ -727,6 +832,7 @@ export default {
       previous_shot: 'Previous entity',
       save_playlist: 'Save playlist',
       see_original_file: 'Open original file in a new tab',
+      select_background: 'Select a background',
       side_by_side: 'Side by side',
       speed: 'Change speed',
       split_screen: 'Compare with other task types',
@@ -734,15 +840,17 @@ export default {
       switch_hd: 'Switch to high definition',
       toggle_annotations: 'Show/Hide annotations while playing movies',
       toggle_laser: 'Enable/Disable drawing laser mode',
+      toggle_environment_skybox: 'Show/Hide skybox background',
       toggle_playing_annotations: 'Show/Hide annotations while playing movies',
-      toggle_waveform: 'Show/Hide movie waveform'
+      toggle_waveform: 'Show/Hide movie waveform',
+      toggle_wireframe: 'Enable/Disable wireframe rendering'
     }
   },
 
   productions: {
     current: 'Selected production',
     delete_text: 'Are you sure you want to remove {name} from your database? Please, confirm by typing the name of the project you want to delete in the text field.',
-    delete_error: 'An error occurred while deleting this production. There are probably data linked to it. Are you sure this production has no task, shot or asset linked to it? Kitsu doesn\'t allow production deletion. If you don\'t want to see the production anymore, you can close it instead.',
+    delete_error: 'An error occurred while deleting this production. There are probably data linked to it. Are you sure this production has no task, shot, or asset linked to it? Kitsu doesn\'t allow production deletion. If you don\'t want to see the production anymore, you can close it instead.',
     edit_error: 'An error occurred while editing production. Please contact our support team.',
     edit_title: 'Edit',
     new_production: 'Add a production',
@@ -750,6 +858,7 @@ export default {
     open_productions: 'My Productions',
     picture: 'Change picture',
     title: 'Productions',
+
     creation: {
       add_assets: 'Add assets (optional)',
       add_asset_types: 'Add asset types',
@@ -766,7 +875,7 @@ export default {
       error: 'An error occurred while creating the production',
       errorImportingAssets: 'An error occurred while importing your assets. The production has been created though!',
       errorImportingShots: 'An error occurred while importing your shots. The production has been created though!',
-      explaination_date: 'These dates are needed to setup your schedule.',
+      explaination_date: 'These dates are needed to set up your schedule.',
       explaination_type: 'If you choose TV Show, the production will be splitted in episodes.',
       explaination_video: 'These settings are used to normalize the uploaded videos.',
       give_a_name: 'Give your production a name',
@@ -803,14 +912,17 @@ export default {
       title: 'My Productions',
       welcome: 'Welcome to NextGen:RISE'
     },
+
     fields: {
       end_date: 'End date',
       episode_span: 'Episode spacing',
       fps: 'FPS',
       is_clients_isolated: 'Isolate client comments (not visible to each others)',
+      is_preview_download_allowed: 'Allow artists to download previews',
       max_retakes: 'Maximum number of retakes',
       name: 'Name',
       nb_episodes: 'Number of episodes',
+      homepage: 'Homepage (first page displayed)',
       ratio: 'Ratio',
       resolution: 'Resolution',
       start_date: 'Start date',
@@ -818,10 +930,11 @@ export default {
       style: 'Style',
       type: 'Type'
     },
+
     metadata: {
       add_explaination: 'Add specific data required by this project.',
       add_failed: 'An error occurred while adding metadata to your project.',
-      add_new_values: 'There is currently no available values.',
+      add_new_values: 'There are currently no available values.',
       available_values: 'Available values',
       boolean: 'Checkbox',
       checklist: 'Checklist',
@@ -829,15 +942,22 @@ export default {
       delete_text: 'Are you sure you want to delete this column and related data for all assets of this production?',
       delete_error: 'An error occurred while deleting this metadata column.',
       edit_title: 'Edit metadata column',
-      error: 'An error occurred while adding the metadata column. Make sure there is no column with similar name and that all fields are filled. If the problem is persists, please contact the support team.',
+      error: 'An error occurred while adding the metadata column. Make sure there is no column with a similar name and that all fields are filled. If the problem persists, please contact the support team.',
       number: 'Number',
       string: 'Text',
+      tags: 'List of tags',
       title: 'Add metadata column'
     },
 
     brief: {
-      empty: 'There is not brief yet. What about creating one?',
+      empty: 'There is no brief yet. What about creating one?',
       title: 'Brief'
+    },
+
+    homepage: {
+      'assets': 'Assets',
+      'shots': 'Shots',
+      'sequences': 'Sequences'
     },
 
     parameters: {
@@ -862,7 +982,7 @@ export default {
       archviz: 'Archviz',
       commercial: 'Commercial',
       catalog: 'Catalog',
-      metaverse: 'Metaverse',
+      immersive: 'Immersive Experience',
       motion_design: 'Motion Design',
       nft: 'NFT collection',
       stop_motion: 'Stop Motion',
@@ -953,6 +1073,7 @@ export default {
     integrations: 'Integrations',
     logo: 'Studio logo',
     no_logo: 'There is no logo set.',
+    remove_logo: 'Remove studio logo',
     set_logo: 'Set studio logo',
     title: 'Settings',
     webhook_error: 'An error occurred while posting webhook',
@@ -977,7 +1098,7 @@ export default {
   },
 
   task_status: {
-    create_error: 'An error occurred while saving this task status. Are you sure there is no task status with similar name?',
+    create_error: 'An error occurred while saving this task status. Are you sure there is no task status with a similar name?',
     delete_text: 'Are you sure you want to remove {name} from your database?',
     delete_error: 'An error occurred while deleting this task status. There are probably data linked to it. Are you sure this task status has no task linked to it?',
     edit_title: 'Edit task status',
@@ -987,6 +1108,7 @@ export default {
     title: 'Task Status',
     fields: {
       color: 'Color',
+      for_concept: 'For concept',
       is_artist_allowed: 'Is artist allowed',
       is_client_allowed: 'Is client allowed',
       is_done: 'Is done',
@@ -1002,8 +1124,9 @@ export default {
     delete_text: 'Are you sure you want to remove {name} from your database?',
     delete_error: 'An error occurred while deleting this task type. There are probably data linked to it. Are you sure this task type has no task linked to it?',
     edit_title: 'Edit task type',
-    create_error: 'An error occurred while creating the task type. Please, check that there is no task type with similar name.',
+    create_error: 'An error occurred while creating the task type. Please, check that there is no task type with a similar name.',
     new_task_type: 'Add a task type',
+    no_task_types: 'There is no task type for this entity type',
     number: 'task type | task types',
     title: 'Task Types',
     fields: {
@@ -1018,8 +1141,8 @@ export default {
 
   sequences: {
     all_sequences: 'All sequences',
-    edit_error: 'An error occurred while saving this sequence. Are you sure there is no sequence with similar name?',
-    delete_text: 'Are you sure you want to remove {name} from your database? Every related shots and previews will be deleted. Please confirm by typing the sequence name below.',
+    edit_error: 'An error occurred while saving this sequence. Are you sure there is no sequence with a similar name?',
+    delete_text: 'Are you sure you want to remove {name} from your database? All related shots and previews will be deleted. Please confirm by typing the sequence name below.',
     delete_error: 'An error occurred while deleting this sequence. There are probably data linked to it. Are you sure this sequence has no shot linked to it?',
     edit_title: 'Edit sequence',
     empty_list: 'There is no sequence in the production. What about creating some?',
@@ -1032,7 +1155,9 @@ export default {
     tasks: 'Tasks',
     fields: {
       name: 'Name',
-      description: 'description'
+      description: 'description',
+      person: 'Person',
+      placeholder: 'SQ01'
     }
   },
 
@@ -1043,18 +1168,21 @@ export default {
     delete_text: 'Are you sure you want to remove {name} from your database?',
     delete_error: 'An error occurred while deleting this edit. There are probably data linked to it.',
     delete_for_selection: 'Delete the selected edit | Delete the {nbSelectedEdits} selected edits',
-    edit_error: 'An error occurred while saving this edit. Are you sure there is no edit with similar name?',
+    edit_error: 'An error occurred while saving this edit. Are you sure there is no edit with a similar name?',
     edit_title: 'Change edit',
     empty_list: 'There are no edits in the production. What about creating some?',
     empty_list_client: 'There are no edits in this production.',
     new_edit: 'New edit',
+    history: 'Edit values history',
     number: 'edit | edits',
+    restore_error: 'An error occurred while restoring this edit.',
     tasks: 'Tasks',
     title: 'Edits',
     fields: {
       name: 'Name',
       episode: 'Ep.',
-      description: 'Description'
+      description: 'Description',
+      person: 'Modifier'
     }
   },
 
@@ -1066,10 +1194,17 @@ export default {
     zoom_level: 'Zoom level',
     milestone: {
       add_milestone: 'Add milestone for',
+      delete_milestone: 'Delete milestone',
       edit_milestone: 'Edit milestone for',
       name: 'Name',
       error: 'An error occurred while adding or editing the milestone. Please try again.'
     }
+  },
+
+  team_schedule: {
+    title: 'Schedule',
+    title_main: 'Team Schedule',
+    person_placeholder: 'Select a person...'
   },
 
   quota: {
@@ -1107,12 +1242,12 @@ export default {
   shots: {
     casting: 'Shot casting',
     cancel_text: 'Are you sure you want to archive {name}?',
-    creation_explaination: 'To add shots you need first to create an episode and a sequence. Type an episode name in the bottom of the left column then click on add to create a new episode. Select this episode and repeat the same operation for sequence. Finally select a sequence and type a shot name in the field in the bottom of the right column. Click on the add button below. Your first shot was created. You can now add many more! If it\'s not a TV Show, you have to directly create a sequence.',
+    creation_explaination: 'To add shots you need first to create an episode and a sequence. Type an episode name in the bottom of the left column then click on add to create a new episode. Select this episode and repeat the same operation for sequence. Finally, select a sequence and type a shot name in the field at the bottom of the right column. Click on the add button below. Your first shot was created. You can now add many more! If it\'s not a TV Show, you have to directly create a sequence.',
     delete_for_selection: 'Delete the selected shot | Delete the {nbSelectedShots} selected shots',
     delete_text: 'Are you sure you want to remove {name} from your database?',
     delete_error: 'An error occurred while deleting this shot. There are probably data linked to it. Are you sure this shot has no task linked to it?',
     edit_success: 'Shot {name} successfully edited.',
-    edit_fail: 'Creation or edition failed, an error occurred. Make sure that you are not renaming the shot with a name already listed for given sequence.',
+    edit_fail: 'Creation or edition failed, an error occurred. Make sure that you are not renaming the shot with a name already listed for a given sequence.',
     edit_title: 'Edit shot',
     empty_list: 'There is no shot in the production. What about creating some?',
     empty_list_client: 'There is no shot in this production.',
@@ -1143,6 +1278,7 @@ export default {
       max_retakes: 'Max Rtks',
       name: 'Name',
       person: 'Modifier',
+      placeholder: 'SH01',
       production: 'Prod',
       resolution: 'Resolution',
       sequence: 'Sequence',
@@ -1151,8 +1287,8 @@ export default {
   },
 
   server_down: {
-    text: 'Please contact your vendor support, your system administrator or your IT department to understand what is going wrong.',
-    title: 'Kitsu encountered an error while reaching its data API.'
+    text: 'Please contact our support, your system administrator or your IT department to understand what is going wrong.',
+    title: 'Kitsu encountered an error while reaching its data API'
   },
 
   statistics: {
@@ -1161,6 +1297,7 @@ export default {
     count_mode: 'Count',
     data_mode: 'Data',
     display_mode: 'Display',
+    episode_status: 'Episode status',
     frames: 'Frames',
     only_running: 'Only running',
     pie: 'Pie charts',
@@ -1178,10 +1315,12 @@ export default {
     auto_revision: 'Restore automatic revision number',
     assign: 'Assign to the selected task | Assign to the {nbSelectedTasks} selected tasks ',
     assign_explaination: 'Select a person to assign...',
-    assignation_warning: 'Warning: you won\'t see the result because you are hiding assignations',
+    assignation_warning: 'Warning: you won\'t see the result because you are hiding assignments',
     back_to_list: 'back to list',
     bigger: 'Widen task panel',
     big_thumbnails: 'Show big thumbnails',
+    build_playlist: 'Build playlist from list',
+    calendar: 'Calendar',
     confirm_attachments: 'Add files as attachments',
     change_status_to: 'Change task status to:',
     change_status: 'Post comment',
@@ -1191,26 +1330,26 @@ export default {
     change_task_status: 'Change status for the selected task | Change status for the {nbSelectedTasks} selected tasks',
     clear_all_assignations: 'unassign all',
     clear_assignations: 'unassign from selection',
-    clear_own_assignations: 'clear your assignations',
+    clear_own_assignations: 'clear your assignments',
     comment_image: 'Attach files to your comment',
     create_for_selection: 'Create a task for each empty cell',
     create_tasks: 'Add tasks',
     create_tasks_shot: 'Add tasks for current shots',
-    create_tasks_shot_explaination: 'You are going to create a new task for each shot of current project for the given task type. Do you want to continue?',
+    create_tasks_shot_explaination: 'You are going to create a new task for each shot of the current project for the given task type. Do you want to continue?',
     create_tasks_shot_failed: 'A server error occurred while proceeding creations.',
     create_tasks_asset: 'Add tasks for current assets',
-    create_tasks_asset_explaination: 'You are going to create a new task for each asset of current project for the given task type. Do you want to continue?',
+    create_tasks_asset_explaination: 'You are going to create a new task for each asset of the current project for the given task type. Do you want to continue?',
     create_tasks_asset_failed: 'A server error occurred while proceeding creations.',
     create_tasks_edit: 'Add tasks for current edits',
-    create_tasks_edit_explaination: 'You are going to create a new task for each edit of current project for the given task type. Do you want to continue?',
+    create_tasks_edit_explaination: 'You are going to create a new task for each edit of the current project for the given task type. Do you want to continue?',
     create_tasks_edit_failed: 'A server error occurred while proceeding creations.',
     create_tasks_episode: 'Add tasks for current episodes',
-    create_tasks_episode_explaination: 'You are going to create a new task for each episode of current project for the given task type. Do you want to continue?',
+    create_tasks_episode_explaination: 'You are going to create a new task for each episode of the current project for the given task type. Do you want to continue?',
     create_tasks_episode_failed: 'A server error occurred while proceeding creations.',
     create_tasks_sequence: 'Add tasks for current sequences',
-    create_tasks_sequence_explaination: 'You are going to create a new task for each sequence of current project for the given task type. Do you want to continue?',
+    create_tasks_sequence_explaination: 'You are going to create a new task for each sequence of the current project for the given task type. Do you want to continue?',
     create_tasks_sequence_failed: 'A server error occurred while proceeding creations.',
-    current: 'Task to do',
+    current: 'Tasks',
     current_status: 'Current status:',
     delete_all_text: 'Are you sure you want to delete all tasks for given {name}? Please, confirm by typing the task type name of the tasks you want to delete in the text field.',
     delete_all_error: 'Deleting all tasks for given task type failed.',
@@ -1240,7 +1379,7 @@ export default {
     full_screen: 'Display in full screen',
     for_selection: 'For current list and filters',
     for_project: 'For project',
-    hide_assignations: 'Hide assignations',
+    hide_assignations: 'Hide assignments',
     hide_infos: 'Hide additional information',
     late: 'Late status',
     my_checks: 'My Checks',
@@ -1248,26 +1387,27 @@ export default {
     nb_selected_tasks: '{nbSelectedTasks} task selected | {nbSelectedTasks} tasks selected',
     new_revision_number: 'New revision number',
     next: 'next task',
-    no_assignation_right: 'You are not allowed to manage assignations',
+    no_assignation_right: 'You are not allowed to manage assignments',
     no_comment: 'There is currently no comment for this task.',
     no_preview: 'There is currently no preview for this task.',
     no_task_selected: 'No task selected',
     number: 'task | tasks',
+    pending: 'Pending',
     post: 'Post',
     publish: 'Publish',
     publish_revision: 'Publish revision',
     preview: 'Previews',
     previous: 'previous task',
     revision_preview_file: 'If one of your selected files contains a revision number in its name (eg. "preview-v3.png"), then it will be suggested as a new revision name (eg. "revision 3") at the next step.',
-    select_preview_file: 'Please select files (pictures, movies or others) from your hard drive to be used as a new preview revision for the current task:',
+    select_preview_file: 'Please select files (pictures, movies, or others) from your hard drive to be used as a new preview revision for the current task:',
     selected_entities: 'Selected entities',
     selected_tasks: 'Selected tasks',
     set_estimations: 'Set estimations for selected tasks:',
     set_preview: 'Set current preview as thumbnail',
     set_preview_error: 'An error occurred while setting preview as thumbnail',
-    set_preview_done: 'This preview is used as thumbnail for the current entity.',
+    set_preview_done: 'This preview is used as the thumbnail for the current entity.',
     set_thumbnails_from_tasks: 'Set the last preview from the selected task as thumbnail | Set last previews from selected tasks as thumbnails',
-    show_assignations: 'Show assignations',
+    show_assignations: 'Show assignments',
     show_infos: 'Show additional information',
     small_thumbnails: 'Show small thumbnails',
     smaller: 'Reduce task panel',
@@ -1279,6 +1419,7 @@ export default {
     tasks: 'Tasks',
     to_myself: 'To myself',
     use_current_frame: 'Use current frame',
+    validated: 'Validated',
     validation: 'Validation',
     with_comment: 'With a comment...',
     fields: {
@@ -1326,12 +1467,16 @@ export default {
     }
   },
 
+  preview: {
+    broken: 'This preview is broken.',
+    processing: 'Video processing in progress...'
+  },
+
   search: {
     limit: 'Max number of results:',
-    match_details: '"{term}" found in {target}',
-    match_details_2: '"{term}" found in {target} metadata',
+    match_details: 'match found in {target}',
     placeholder: 'Search for an entity in the database...',
-    title: 'Entity Search',
+    title: 'Entity Search'
   },
 
   timesheets: {
@@ -1340,7 +1485,7 @@ export default {
     detail_level: 'Detail level',
     done_tasks: 'Done tasks',
     export_timesheet: 'Export Timesheet',
-    export_timespents: 'Export time spents for open projects as a list',
+    export_timespents: 'Export time spent entries for open projects as a list',
     hours: 'hours',
     month: 'Month',
     time_spents: 'Time Spent (hours)',

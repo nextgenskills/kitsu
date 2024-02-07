@@ -41,13 +41,17 @@ export const descriptorMixin = {
     },
 
     onMetadataFieldChanged(entry, descriptor, event) {
-      if (!event.target.validity.valid) {
-        return
-      }
-
       let value
-      if (descriptor.data_type === 'boolean') {
+      if (typeof event === 'string') {
+        value = event
+      } else if (!event.target.validity.valid) {
+        return
+      } else if (descriptor.data_type === 'boolean') {
         value = event.target.checked ? 'true' : 'false'
+      } else if (descriptor.data_type === 'number') {
+        value = !isNaN(event.target.valueAsNumber)
+          ? event.target.valueAsNumber
+          : null
       } else {
         value = event.target.value
       }
@@ -96,7 +100,8 @@ export const descriptorMixin = {
       this.$emit('change-sort', {
         type: 'metadata',
         column: column.field_name,
-        name: column.name
+        name: column.name,
+        data_type: column.data_type
       })
       this.showMetadataHeaderMenu()
     },
@@ -129,16 +134,27 @@ export const descriptorMixin = {
       this.lastMetadaDataHeaderMenuDisplayed = columnId
     },
 
-    getDescriptorChoicesOptions(descriptor) {
+    getDescriptorChoicesOptions(descriptor, emptyChoice = true) {
       const values = descriptor.choices.map(c => ({ label: c, value: c }))
-      return [{ label: '', value: '' }, ...values]
+      if (emptyChoice) {
+        values.unshift({ label: '', value: '' })
+      }
+      return values
     },
 
     getMetadataFieldValue(descriptor, entity) {
-      if (entity.data) {
-        return entity.data[descriptor.field_name] || ''
-      } else if (entity.entity_data) {
-        return entity.entity_data[descriptor.field_name] || ''
+      if (
+        entity.data &&
+        descriptor.field_name in entity.data &&
+        entity.data[descriptor.field_name] != null
+      ) {
+        return entity.data[descriptor.field_name]
+      } else if (
+        entity.entity_data &&
+        descriptor.field_name in entity.entity_data &&
+        entity.entity_data[descriptor.field_name] != null
+      ) {
+        return entity.entity_data[descriptor.field_name]
       } else {
         return ''
       }

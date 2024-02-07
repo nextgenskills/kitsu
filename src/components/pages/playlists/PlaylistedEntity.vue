@@ -12,7 +12,7 @@
             class="remove-button flexrow-item"
             :title="$t('playlists.remove')"
             @click.prevent="onRemoveClick"
-            v-if="isCurrentUserManager"
+            v-if="isCurrentUserManager || isCurrentUserSupervisor"
           >
             <x-icon />
           </span>
@@ -23,16 +23,15 @@
           />
         </div>
 
-        <div class="entity-title">
-          <span
-            :style="{
-              color: taskStatus.color
-            }"
-            :title="taskStatus.name"
-          >
-            &bullet;
-          </span>
-          <span>{{ entity.parent_name }} / {{ entity.name }}</span>
+        <div
+          class="entity-title"
+          :title="taskStatus.name"
+          :style="{
+            'border-bottom': '2px solid ' + taskStatus.color,
+            'padding-bottom': '5px'
+          }"
+        >
+          {{ entity.parent_name }} / {{ entity.name }}
         </div>
 
         <div class="preview-choice" v-if="taskTypeOptions.length > 0">
@@ -129,7 +128,8 @@ export default {
       'taskMap',
       'taskTypeMap',
       'taskStatusMap',
-      'isCurrentUserManager'
+      'isCurrentUserManager',
+      'isCurrentUserSupervisor'
     ]),
 
     dropArea() {
@@ -163,11 +163,7 @@ export default {
     },
 
     taskStatus() {
-      let entity = this.shotMap.get(this.entity.id)
-      if (!entity) entity = this.assetMap.get(this.entity.id)
-      if (!entity) return ''
-
-      const taskId = entity.validations.get(this.taskTypeId)
+      const taskId = this.entity.preview_file_task_id
       if (taskId) {
         const task = this.taskMap.get(taskId)
         if (!task) return ''

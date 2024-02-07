@@ -5,26 +5,31 @@
     :style="{
       width: emptyWidth + 'px',
       'min-width': emptyWidth + 'px',
-      height: emptyHeight + 'px'
+      height: emptyHeight + 'px',
+      cursor: noPreview ? 'default' : 'zoom-in'
     }"
     @click="onClicked"
     v-if="isPreview && withLink"
   >
     <img
       class="thumbnail-picture"
+      loading="lazy"
+      :key="thumbnailKey"
+      :src="thumbnailPath"
       :style="imgStyle"
       :width="width || ''"
-      v-lazy="thumbnailPath"
-      :key="thumbnailKey"
+      alt=""
     />
   </a>
 
   <img
     v-else-if="isPreview && !withLink"
-    :key="thumbnailKey"
     class="thumbnail-picture"
+    loading="lazy"
+    :key="thumbnailKey"
+    :src="thumbnailPath"
     :style="imgStyle"
-    v-lazy="thumbnailPath"
+    alt=""
   />
 
   <span
@@ -103,8 +108,8 @@ export default {
     },
 
     isPreview() {
-      const previewFileId = this.previewFileId || this.entity.preview_file_id
-      return previewFileId && previewFileId.length > 0
+      const previewFileId = this.previewFileId || this.entity?.preview_file_id
+      return previewFileId?.length > 0
     },
 
     imgStyle() {
@@ -141,11 +146,17 @@ export default {
       } else {
         if (this.width && this.width > 150) {
           return (
-            '/api/pictures/previews/preview-files/' + previewFileId + '.png' + this.timer
+            '/api/pictures/previews/preview-files/' +
+            previewFileId +
+            '.png' +
+            this.timer
           )
         } else {
           return (
-            '/api/pictures/thumbnails/preview-files/' + previewFileId + '.png' + this.timer
+            '/api/pictures/thumbnails/preview-files/' +
+            previewFileId +
+            '.png' +
+            this.timer
           )
         }
       }
@@ -171,7 +182,6 @@ export default {
     },
 
     'entity.preview_file_id'() {
-      console.log('changed')
       this.timer = '?t=' + new Date().valueOf()
     }
   }

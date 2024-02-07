@@ -115,12 +115,9 @@ const actions = {
 
   loadMilestones({ commit, rootState }) {
     const production = rootState.productions.currentProduction
-    return scheduleApi
-      .getMilestones(production)
-      .then(milestones => {
-        commit(ADD_MILESTONES, milestones)
-      })
-      .catch(console.error)
+    return scheduleApi.getMilestones(production).then(milestones => {
+      commit(ADD_MILESTONES, milestones)
+    })
   },
 
   saveMilestone({ commit, rootState }, milestone) {
@@ -132,28 +129,23 @@ const actions = {
           commit(ADD_MILESTONE, milestone)
         })
     } else {
-      return scheduleApi
-        .updateMilestone(milestone)
-        .then(milestone => {
-          commit(ADD_MILESTONE, milestone)
-        })
-        .catch(console.error)
+      return scheduleApi.updateMilestone(milestone).then(milestone => {
+        commit(ADD_MILESTONE, milestone)
+      })
     }
   },
 
-  deleteMilestone({ commit, rootState }, milestone) {
-    return scheduleApi
-      .deleteMilestone(milestone)
-      .then(milestone => {
-        commit(REMOVE_MILESTONE, milestone)
-      })
-      .catch(console.error)
+  deleteMilestone({ commit }, milestone) {
+    return scheduleApi.deleteMilestone(milestone).then(() => {
+      commit(REMOVE_MILESTONE, milestone)
+    })
   }
 }
 
 const mutations = {
   [ADD_MILESTONE](state, milestone) {
     state.milestones[milestone.date] = milestone
+    state.milestones = { ...state.milestones } // for reactivity
   },
 
   [ADD_MILESTONES](state, milestones) {
@@ -165,6 +157,7 @@ const mutations = {
 
   [REMOVE_MILESTONE](state, milestone) {
     delete state.milestones[milestone.date.format('YYYY-MM-DD')]
+    state.milestones = { ...state.milestones } // for reactivity
   },
 
   [SET_CURRENT_SCHEDULE_ITEMS](state, items) {

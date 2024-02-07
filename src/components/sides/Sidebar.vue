@@ -3,7 +3,7 @@
     <aside :class="{ 'hidden-bar': isSidebarHidden }">
       <div>
         <router-link class="home-link" to="/" @click="toggleSidebar()">
-          <div class="company-logo has-text-centered">
+          <div class="company-logo has-text-centered" :title="title">
             <img
               :src="logoPath"
               v-if="organisation && organisation.has_avatar"
@@ -23,19 +23,19 @@
 
             <p @click="toggleSidebar()">
               <router-link :to="{ name: 'todos' }">
-                <check-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="my-tasks" />
                 {{ $t('tasks.my_tasks') }}
               </router-link>
             </p>
             <p @click="toggleSidebar()" v-if="isCurrentUserSupervisor">
               <router-link :to="{ name: 'checks' }">
-                <play-circle-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="my-checks" />
                 {{ $t('tasks.my_checks') }}
               </router-link>
             </p>
             <p @click="toggleSidebar()">
               <router-link :to="{ name: 'open-productions' }">
-                <film-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="my-productions" />
                 {{ $t('productions.open_productions') }}
               </router-link>
             </p>
@@ -46,29 +46,39 @@
 
             <p @click="toggleSidebar()" v-if="isCurrentUserAdmin">
               <router-link :to="{ name: 'productions' }">
-                <film-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="productions" />
                 {{ $t('productions.title') }}
               </router-link>
             </p>
 
             <p @click="toggleSidebar()" v-if="isCurrentUserAdmin">
               <router-link :to="{ name: 'people' }">
-                <users-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="team" />
                 {{ $t('people.title') }}
               </router-link>
             </p>
 
             <p @click="toggleSidebar()">
               <router-link :to="{ name: 'timesheets' }">
-                <clock-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="timesheets" />
                 {{ $t('timesheets.title') }}
               </router-link>
             </p>
 
             <p @click="toggleSidebar()" v-if="isCurrentUserAdmin">
               <router-link :to="{ name: 'main-schedule' }">
-                <calendar-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="schedule" />
                 {{ $t('schedule.title_main') }}
+              </router-link>
+            </p>
+
+            <p @click="toggleSidebar()" v-if="isCurrentUserAdmin">
+              <router-link
+                style="position: relative"
+                :to="{ name: 'team-schedule' }"
+              >
+                <kitsu-icon class="nav-icon" name="team-schedule" />
+                {{ $t('team_schedule.title_main') }}
               </router-link>
             </p>
 
@@ -77,17 +87,13 @@
                 :to="{ name: 'newsfeed' }"
                 v-if="isCurrentUserManager"
               >
-                <clock-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="newsFeed" />
                 {{ $t('news.title') }}
               </router-link>
             </p>
-
-            <p @click="toggleSidebar()">
-              <router-link
-                :to="{ name: 'entity-search' }"
-                v-if="isCurrentUserManager"
-              >
-                <search-icon size="0.9x" />
+            <p @click="toggleSidebar()" v-if="mainConfig.indexer_configured">
+              <router-link :to="{ name: 'entity-search' }">
+                <kitsu-icon class="nav-icon" name="search" />
                 {{ $t('search.title') }}
               </router-link>
             </p>
@@ -97,49 +103,55 @@
             <h2>{{ $t('main.admin') }}</h2>
             <p @click="toggleSidebar()">
               <router-link :to="{ name: 'departments' }">
-                <hexagon-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="departments" />
                 {{ $t('departments.title') }}
               </router-link>
             </p>
             <p @click="toggleSidebar()">
               <router-link to="/task-types">
-                <copy-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="task-types" />
                 {{ $t('task_types.title') }}
               </router-link>
             </p>
             <p @click="toggleSidebar()">
               <router-link to="/task-status" class="task-status-link">
-                <award-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="task-status" />
                 {{ $t('task_status.title') }}
               </router-link>
             </p>
             <p @click="toggleSidebar()">
               <router-link to="/asset-types">
-                <box-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="asset-types" />
                 {{ $t('asset_types.title') }}
               </router-link>
             </p>
             <p @click="toggleSidebar()">
               <router-link :to="{ name: 'custom-actions' }">
-                <git-pull-request-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="custom" />
                 {{ $t('custom_actions.title') }}
               </router-link>
             </p>
             <p @click="toggleSidebar()">
               <router-link :to="{ name: 'status-automations' }">
-                <tool-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="automations" />
                 {{ $t('status_automations.title') }}
               </router-link>
             </p>
             <p @click="toggleSidebar()">
+              <router-link :to="{ name: 'backgrounds' }">
+                <globe-icon class="nav-icon" size="0.9x" />
+                {{ $t('backgrounds.title') }}
+              </router-link>
+            </p>
+            <p @click="toggleSidebar()">
               <router-link :to="{ name: 'settings' }">
-                <settings-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="settings" />
                 {{ $t('settings.title') }}
               </router-link>
             </p>
             <p @click="toggleSidebar()">
               <router-link :to="{ name: 'logs' }">
-                <list-icon size="0.9x" />
+                <kitsu-icon class="nav-icon" name="logs" />
                 {{ $t('logs.title') }}
               </router-link>
             </p>
@@ -157,42 +169,15 @@
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
-import {
-  AwardIcon,
-  BoxIcon,
-  CopyIcon,
-  CalendarIcon,
-  CheckIcon,
-  ClockIcon,
-  FilmIcon,
-  GitPullRequestIcon,
-  HexagonIcon,
-  ListIcon,
-  PlayCircleIcon,
-  SearchIcon,
-  SettingsIcon,
-  ToolIcon,
-  UsersIcon
-} from 'vue-feather-icons'
+import { GlobeIcon } from 'vue-feather-icons'
+
+import KitsuIcon from '@/components/widgets/KitsuIcon'
 
 export default {
   name: 'sidebar',
   components: {
-    AwardIcon,
-    BoxIcon,
-    CopyIcon,
-    CalendarIcon,
-    CheckIcon,
-    ClockIcon,
-    FilmIcon,
-    GitPullRequestIcon,
-    HexagonIcon,
-    ListIcon,
-    PlayCircleIcon,
-    SearchIcon,
-    SettingsIcon,
-    ToolIcon,
-    UsersIcon
+    GlobeIcon,
+    KitsuIcon
   },
 
   data() {
@@ -216,7 +201,9 @@ export default {
       'isCurrentUserVendor',
       'isSidebarHidden',
       'organisation',
-      'isSimpleMode'
+      'isSimpleMode',
+      'mainConfig',
+      'organisation'
     ])
   },
 
@@ -259,7 +246,7 @@ aside {
   top: 0;
   bottom: 0;
   left: 0;
-  width: 250px;
+  width: 230px;
   background-color: white;
   padding: 15px;
   overflow-y: auto;
@@ -342,6 +329,12 @@ p:hover {
   border-radius: 5px;
   transform: scale(1.05);
   transition: 0.2s ease transform;
+}
+
+.nav-icon {
+  margin-left: 0em;
+  margin-right: 0.4em;
+  width: 20px;
 }
 
 @media screen and (max-width: 768px) {

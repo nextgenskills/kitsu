@@ -1,4 +1,3 @@
-import Vue from 'vue/dist/vue'
 import peopleApi from '@/store/api/people'
 import colors from '@/lib/colors'
 import { clearSelectionGrid } from '@/lib/selection'
@@ -20,6 +19,7 @@ import {
   IMPORT_PEOPLE_ERROR,
   IMPORT_PEOPLE_END,
   UPLOAD_AVATAR_END,
+  CLEAR_AVATAR,
   USER_SAVE_PROFILE_SUCCESS,
   LOAD_PERSON_TASKS_END,
   LOAD_PERSON_DONE_TASKS_END,
@@ -48,31 +48,35 @@ import {
 
 const helpers = {
   addAdditionalInformation(person) {
-    if (person) {
-      if (person.first_name && person.last_name) {
-        person.name = `${person.first_name} ${person.last_name}`
-        person.initials = `${person.first_name[0]}${person.last_name[0]}`
-      } else if (person.first_name) {
-        person.name = person.first_name
-        person.initials = person.first_name[0]
-      } else if (person.last_name) {
-        person.name = person.last_name
-        person.initials = person.last_name[0]
-      } else if (person.email) {
-        person.name = person.email
-        person.initials = person.email[0]
-      } else {
-        person.name = ''
-        person.initials = 'NN'
-      }
+    if (!person) {
+      return
+    }
 
-      Vue.set(person, 'initials', person.initials.toUpperCase())
-      person.color = colors.fromString(person.name)
-      if (person.has_avatar && !person.uniqueHash) {
-        const randomHash = Math.random().toString(36).substring(7)
-        Vue.set(person, 'uniqueHash', randomHash)
-        person.avatarPath = `/api/pictures/thumbnails/persons/${person.id}.png`
-      }
+    const { email, first_name, last_name } = person
+
+    if (first_name && last_name) {
+      person.name = `${first_name} ${last_name}`
+      person.initials = `${first_name[0]}${last_name[0]}`
+    } else if (first_name) {
+      person.name = first_name
+      person.initials = first_name[0]
+    } else if (last_name) {
+      person.name = last_name
+      person.initials = last_name[0]
+    } else if (email) {
+      person.name = email
+      person.initials = email[0]
+    } else {
+      person.name = ''
+      person.initials = 'NN'
+    }
+    person.initials = person.initials.toUpperCase()
+    person.color = colors.fromString(person.name)
+
+    if (person.has_avatar) {
+      const lastUpdate = person.updated_at || person.created_at
+      const timestamp = Date.parse(lastUpdate)
+      person.avatarPath = `/api/pictures/thumbnails/persons/${person.id}.png?t=${timestamp}`
     }
     return person
   },
@@ -203,7 +207,7 @@ const getters = {
   getPersonOptions: state =>
     state.people.map(person => {
       return {
-        label: `${person.first_name} ${person.last_name}`,
+        label: person.full_name,
         value: person.id
       }
     }),
@@ -226,20 +230,21 @@ const actions = {
     form.id = state.organisation.id
     return peopleApi.updateOrganisation(form).then(organisation => {
       commit(SET_ORGANISATION, organisation)
-      Promise.resolve(organisation)
+      return organisation
     })
   },
 
   uploadOrganisationLogo({ commit, state }, formData) {
-    return new Promise((resolve, reject) => {
-      const organisationId = state.organisation.id
-      peopleApi
-        .postOrganisationLogo(organisationId, formData)
-        .then(organisation => {
-          commit(SET_ORGANISATION, { has_avatar: true })
-          resolve()
-        })
-        .catch(reject)
+    const organisationId = state.organisation.id
+    return peopleApi.postOrganisationLogo(organisationId, formData).then(() => {
+      commit(SET_ORGANISATION, { has_avatar: true })
+    })
+  },
+
+  deleteOrganisationLogo({ commit, state }) {
+    const organisationId = state.organisation.id
+    return peopleApi.deleteOrganisationLogo(organisationId).then(() => {
+      commit(SET_ORGANISATION, { has_avatar: false })
     })
   },
 
@@ -262,16 +267,14 @@ const actions = {
     })
   },
 
-  loadPerson({ commit, state }, personId) {
-    peopleApi.getPerson(personId, (err, person) => {
-      if (err) console.error(err)
-    })
+  async loadPerson({ commit, state }, personId) {
+    const person = await peopleApi.getPerson(personId)
+    commit(EDIT_PEOPLE_END, person)
   },
 
   newPerson({ commit, state }, data) {
     return peopleApi.createPerson(data).then(person => {
       commit(EDIT_PEOPLE_END, person)
-      Promise.resolve()
     })
   },
 
@@ -337,6 +340,28 @@ const actions = {
         commit(IMPORT_PEOPLE_ERROR)
         Promise.reject(err)
       })
+  },
+
+  async fetchPersonTasks({ commit, rootGetters }, personId) {
+    const tasks = (
+      await Promise.all([
+        peopleApi.getPersonTasks(personId),
+        peopleApi.getPersonDoneTasks(personId)
+      ])
+    ).flat()
+    tasks.forEach(task => {
+      populateTask(task)
+      task.taskStatus = helpers.getTaskStatus(task.task_status_id)
+    })
+
+    commit(LOAD_PERSON_TASKS_END, {
+      personId,
+      tasks,
+      userFilters: rootGetters.userFilters,
+      taskTypeMap: rootGetters.taskTypeMap
+    })
+
+    return tasks
   },
 
   loadPersonTasks(
@@ -422,26 +447,22 @@ const actions = {
   },
 
   savePersonTasksSearch({ commit, rootGetters }, searchQuery) {
-    const query = state.personTaskSearchQueries.find(
-      query => query.name === searchQuery
-    )
-
-    if (!query) {
-      return peopleApi
-        .createFilter('persontasks', searchQuery, searchQuery, null, null)
-        .then(searchQuery => {
-          commit(SAVE_PERSON_TASKS_SEARCH_END, { searchQuery })
-          return Promise.resolve(searchQuery)
-        })
-    } else {
-      return Promise.resolve()
+    if (
+      state.personTaskSearchQueries.some(query => query.name === searchQuery)
+    ) {
+      return
     }
+    return peopleApi
+      .createFilter('persontasks', searchQuery, searchQuery, null, null)
+      .then(searchQuery => {
+        commit(SAVE_PERSON_TASKS_SEARCH_END, { searchQuery })
+        return searchQuery
+      })
   },
 
-  removePersonTasksSearch({ commit, rootGetters }, searchQuery) {
+  removePersonTasksSearch({ commit }, searchQuery) {
     return peopleApi.removeFilter(searchQuery).then(() => {
       commit(REMOVE_PERSON_TASKS_SEARCH_END, { searchQuery })
-      return Promise.resolve()
     })
   },
 
@@ -507,27 +528,21 @@ const actions = {
     })
   },
 
-  savePeopleSearch({ commit, rootGetters }, searchQuery) {
-    const query = state.peopleSearchQueries.find(
-      query => query.name === searchQuery
-    )
-
-    if (!query) {
-      peopleApi
-        .createFilter('people', searchQuery, searchQuery, null, null)
-        .then(searchQuery => {
-          commit(SAVE_PEOPLE_SEARCH_END, { searchQuery })
-          return Promise.resolve(searchQuery)
-        })
-    } else {
-      Promise.resolve()
+  savePeopleSearch({ commit }, searchQuery) {
+    if (state.peopleSearchQueries.some(query => query.name === searchQuery)) {
+      return
     }
+    return peopleApi
+      .createFilter('people', searchQuery, searchQuery, null, null)
+      .then(searchQuery => {
+        commit(SAVE_PEOPLE_SEARCH_END, { searchQuery })
+        return searchQuery
+      })
   },
 
-  removePeopleSearch({ commit, rootGetters }, searchQuery) {
+  removePeopleSearch({ commit }, searchQuery) {
     return peopleApi.removeFilter(searchQuery).then(() => {
       commit(REMOVE_PEOPLE_SEARCH_END, { searchQuery })
-      return Promise.resolve()
     })
   },
 
@@ -565,19 +580,15 @@ const mutations = {
   [LOAD_PEOPLE_END](state, { people, userFilters }) {
     state.isPeopleLoading = false
     state.isPeopleLoadingError = false
-    state.people = sortPeople(people)
-    state.displayedPeople = state.people
-    state.people.forEach(person => {
+    state.people = sortPeople(people).map(person => {
       person = helpers.addAdditionalInformation(person)
       state.personMap.set(person.id, person)
+      return person
     })
+    state.displayedPeople = state.people
     cache.peopleIndex = buildNameIndex(state.people)
 
-    if (userFilters.people && userFilters.people.all) {
-      state.peopleSearchQueries = userFilters.people.all
-    } else {
-      state.shotSearchQueries = []
-    }
+    state.peopleSearchQueries = userFilters.people?.all || []
   },
 
   [DELETE_PEOPLE_END](state, person) {
@@ -664,10 +675,16 @@ const mutations = {
   [UPLOAD_AVATAR_END](state, personId) {
     const person = state.personMap.get(personId)
     if (person) {
-      const randomHash = Math.random().toString(36).substring(7)
+      const timestamp = Date.now()
+      person.avatarPath = `/api/pictures/thumbnails/persons/${person.id}.png?t=${timestamp}`
       person.has_avatar = true
-      Vue.set(person, 'uniqueHash', randomHash)
-      person.avatarPath = `/api/pictures/thumbnails/persons/${person.id}.png`
+    }
+  },
+
+  [CLEAR_AVATAR](state, personId) {
+    const person = state.personMap.get(personId)
+    if (person) {
+      person.has_avatar = false
     }
   },
 
@@ -704,6 +721,7 @@ const mutations = {
   [LOAD_PERSON_DONE_TASKS_END](state, tasks) {
     tasks.forEach(populateTask)
     state.displayedPersonDoneTasks = tasks
+    cache.personDoneTasks = tasks
     cache.personDoneTasksIndex = buildTaskIndex(tasks)
   },
 
@@ -831,8 +849,7 @@ const mutations = {
   },
 
   [SET_ORGANISATION](state, organisation) {
-    Object.assign(state.organisation, organisation)
-    state.organisation = { ...state.organisation }
+    state.organisation = { ...state.organisation, ...organisation }
   },
 
   [RESET_ALL](state, people) {

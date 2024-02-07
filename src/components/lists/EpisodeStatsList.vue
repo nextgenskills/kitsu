@@ -116,7 +116,6 @@
                 <td class="name datatable-row-header">
                   - Take {{ takeNumber }}
                 </td>
-                <td class="description"></td>
                 <td></td>
 
                 <template v-for="columnId in validationColumns">
@@ -208,7 +207,7 @@ import StatsCell from '@/components/cells/StatsCell'
 import TableInfo from '@/components/widgets/TableInfo'
 
 export default {
-  name: 'episode-list',
+  name: 'episode-stats-list',
   mixins: [entityListMixin],
 
   components: {
@@ -255,7 +254,6 @@ export default {
 
   data() {
     return {
-      busy: false,
       expanded: {},
       lastSelection: null,
       takeLabelColors: ['#FB8C00', '#EF6C00', '#d35400', '#e74c3c', '#c0392b']

@@ -17,25 +17,25 @@
         v-if="currentDepartment"
       />
       <router-link
-        class="flexrow-item datatable-dropdown task-type-name"
-        style="margin-right: 0"
+        class="flexrow-item datatable-dropdown ellipsis task-type-name"
         :to="taskTypePath(columnId)"
         v-if="!isCurrentUserClient"
       >
         {{ !hiddenColumns[columnId] ? taskTypeMap.get(columnId).name : '' }}
       </router-link>
       <span
-        class="flexrow-item datatable-dropdown task-type-name"
-        style="margin-right: 0"
+        class="flexrow-item datatable-dropdown ellipsis task-type-name"
         v-else
       >
         {{ !hiddenColumns[columnId] ? taskTypeMap.get(columnId).name : '' }}
       </span>
 
-      <chevron-down-icon
+      <span
+        class="metadata-menu-button header-icon"
         @click="$emit('show-header-menu', $event)"
-        class="header-icon flexrow-item"
-      />
+      >
+        <chevron-down-icon :size="'12'" />
+      </span>
     </div>
   </th>
 </template>
@@ -46,7 +46,7 @@ import { mapGetters } from 'vuex'
 import DepartmentName from '@/components/widgets/DepartmentName'
 
 export default {
-  name: 'ValidationHeader',
+  name: 'validation-header',
   props: {
     hiddenColumns: Object,
     columnId: String,
@@ -128,6 +128,7 @@ th.metadata-descriptor {
   font-size: 1.1em;
   max-width: 95%;
   text-transform: none;
+  margin-right: 0;
 }
 
 .header-icon {
@@ -135,5 +136,14 @@ th.metadata-descriptor {
   border-radius: 50%;
   height: 18px;
   padding: 1px;
+}
+
+.metadata-menu-button {
+  background: var(--background);
+  border-radius: 50%;
+  height: 15px;
+  width: 15px;
+  position: absolute;
+  right: 5px;
 }
 </style>

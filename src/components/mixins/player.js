@@ -2,6 +2,7 @@ import { mapActions, mapGetters } from 'vuex'
 import {
   formatTime,
   formatFrame,
+  ceilToFrame,
   roundToFrame,
   floorToFrame
 } from '@/lib/video'
@@ -171,7 +172,10 @@ export const playerMixin = {
           extension: this.currentEntity.preview_file_extension,
           task_id: this.currentEntity.preview_file_task_id,
           revision: this.currentEntity.preview_file_revision,
-          annotations: this.currentEntity.preview_file_annotations || []
+          width: this.currentEntity.preview_file_width,
+          height: this.currentEntity.preview_file_height,
+          annotations: this.currentEntity.preview_file_annotations || [],
+          duration: this.currentEntity.preview_file_duration || 0
         }
       } else {
         return this.currentEntity.preview_file_previews[
@@ -264,7 +268,13 @@ export const playerMixin = {
     },
 
     nbFrames() {
-      return Math.round(this.maxDurationRaw * this.fps)
+      const isChromium = !!window.chrome
+      const change = isChromium ? this.frameDuration : 0
+      const duration =
+        this.currentPreview && this.currentPreview.duration
+          ? this.currentPreview.duration
+          : this.maxDurationRaw + change
+      return Math.round(duration * this.fps)
     }
   },
 
@@ -402,7 +412,18 @@ export const playerMixin = {
     },
 
     play() {
-      if (this.isCurrentPreviewPicture) {
+      if (this.isFullMode) {
+        if (
+          this.fullPlayer.currentTime >=
+          this.fullPlayer.duration - this.frameDuration
+        ) {
+          this.setPlaylistProgress(0)
+          this.progress.updateProgressBar(0)
+          this.$nextTick(this.playFullBuild)
+        } else {
+          this.playFullBuild()
+        }
+      } else if (this.isCurrentPreviewPicture) {
         this.playPicture()
       } else if (this.isCurrentPreviewSound) {
         this.playSound()
@@ -417,6 +438,12 @@ export const playerMixin = {
       this.clearCanvas()
     },
 
+    playFullBuild() {
+      this.fullPlayer.play()
+      this.isPlaying = true
+      this._runPlaylistProgressUpdateLoop()
+    },
+
     _setCurrentTimeOnHandleIn() {
       if (this.handleIn > 1 && this.frameNumber < this.handleIn) {
         this.rawPlayer.setCurrentTimeRaw(this.handleIn * this.frameDuration)
@@ -424,19 +451,52 @@ export const playerMixin = {
       }
     },
 
+    _runPlaylistProgressUpdateLoop() {
+      clearInterval(this.$options.playLoop)
+      this.$options.playLoop = setInterval(() => {
+        this.setPlaylistProgress(this.fullPlayer.currentTime)
+        if (this.currentEntity) {
+          const entityTime =
+            this.fullPlayer.currentTime - this.currentEntity.start_duration
+          const frame = entityTime * this.fps
+          this.progress.updateProgressBar(frame)
+        }
+      }, 1000 / this.fps)
+    },
+
+    _stopPlaylistProgressUpdateLoop() {
+      clearInterval(this.$options.playLoop)
+    },
+
     pause() {
       this.showCanvas()
-      if (this.isCurrentPreviewMovie) {
+
+      if (this.isFullMode) {
+        this.fullPlayer.pause()
+        this.isPlaying = false
+        this._stopPlaylistProgressUpdateLoop()
+      } else if (this.isCurrentPreviewMovie) {
         const comparisonPlayer = this.$refs['raw-player-comparison']
+        let currentTime = 0
+        if (this.rawPlayer) {
+          currentTime = ceilToFrame(
+            this.rawPlayer.getCurrentTimeRaw(),
+            this.fps
+          )
+        }
         if (this.rawPlayer) this.rawPlayer.pause()
         if (comparisonPlayer) comparisonPlayer.pause()
+        if (comparisonPlayer) {
+          this.rawPlayer.setCurrentTimeRaw(currentTime)
+          comparisonPlayer.setCurrentTimeRaw(currentTime)
+        }
       } else if (this.isCurrentPreviewSound) {
         this.soundPlayer.pause()
       }
       this.isPlaying = false
     },
 
-    playEntity(entityIndex) {
+    playEntity(entityIndex, updateFullPlaylist = true, frame = -1) {
       const entity = this.entityList[entityIndex]
       const wasDrawing = this.isDrawing === true
       this.clearCanvas()
@@ -447,13 +507,24 @@ export const playerMixin = {
           this.scrollToEntity(this.playingEntityIndex)
           this.rawPlayer.loadEntity(entityIndex)
           this.annotations = entity.preview_file_annotations || []
+          this.onProgressChanged(frame + 1, false)
           if (this.isComparing) {
             this.$refs['raw-player-comparison'].loadEntity(entityIndex)
           }
           if (this.isPlaying) {
-            this.rawPlayer.play()
-            if (this.isComparing) this.$refs['raw-player-comparison'].play()
+            if (!this.isFullMode) {
+              this.rawPlayer.play()
+              if (this.isComparing) this.$refs['raw-player-comparison'].play()
+            }
           } else {
+            if (updateFullPlaylist) {
+              if (this.isFullMode && !this.isPlaying) {
+                this.fullPlayer.currentTime = entity.start_duration
+                this.playlistProgress = entity.start_duration
+              } else if (!this.isFullMode) {
+                this.playlistProgress = entity.start_duration
+              }
+            }
             this.showCanvas()
           }
         })
@@ -480,29 +551,70 @@ export const playerMixin = {
         this.isComparing &&
         this.rawPlayerComparison.currentPlayer
       ) {
-        const currentTimeRaw = this.rawPlayer.getCurrentTimeRaw()
-        this.rawPlayerComparison.currentPlayer.currentTime = currentTimeRaw
+        const currentTimeRaw = Number(
+          this.rawPlayer.getCurrentTimeRaw().toPrecision(4)
+        )
+        this.rawPlayerComparison.setCurrentTimeRaw(currentTimeRaw)
       }
     },
 
     goPreviousFrame() {
       this.clearCanvas()
-      this.rawPlayer.goPreviousFrame()
-      if (this.isComparing) this.syncComparisonPlayer()
-      const annotation = this.getAnnotation(
-        this.rawPlayer.getCurrentTime() - this.frameDuration
-      )
-      if (annotation) this.loadSingleAnnotation(annotation)
+      if (this.isFullMode) {
+        let previousFrameTime = this.fullPlayer.currentTime - this.frameDuration
+        const previousFrame = Math.round(previousFrameTime * this.fps)
+        const entityPosition = this.playlistShotPosition[previousFrame]
+        if (!entityPosition) return
+
+        const entityIndex = entityPosition.index
+        const entity = this.entityList[entityIndex]
+        if (entityIndex !== this.playingEntityIndex) {
+          const shotTime = entity.preview_file_duration
+          const endFrame = Math.round(shotTime * this.fps)
+          this.playEntity(entityIndex, false, endFrame)
+          this.onProgressChanged(endFrame, false)
+        }
+        previousFrameTime = previousFrame / this.fps
+        this.setFullPlayerTime(previousFrameTime)
+      } else {
+        this.rawPlayer.goPreviousFrame()
+        if (this.isComparing) this.syncComparisonPlayer()
+        const annotation = this.getAnnotation(this.rawPlayer.getCurrentTime())
+        if (annotation) this.loadSingleAnnotation(annotation)
+      }
     },
 
     goNextFrame() {
       this.clearCanvas()
-      this.rawPlayer.goNextFrame()
-      if (this.isComparing) this.syncComparisonPlayer()
-      const annotation = this.getAnnotation(
-        this.rawPlayer.getCurrentTime() - this.frameDuration
-      )
-      if (annotation) this.loadSingleAnnotation(annotation)
+      if (this.isFullMode) {
+        let nextFrameTime = this.fullPlayer.currentTime + this.frameDuration
+        const nextFrame = Math.round(nextFrameTime * this.fps)
+        const entityIndex = this.playlistShotPosition[nextFrame].index
+        if (entityIndex !== this.playingEntityIndex) {
+          this.playEntity(entityIndex, false)
+        }
+        nextFrameTime = nextFrame / this.fps
+        this.setFullPlayerTime(nextFrameTime)
+      } else {
+        const nextFrameTime =
+          this.rawPlayer.getCurrentTimeRaw() + this.frameDuration + 0.0001
+        const nextFrame = Math.round(nextFrameTime * this.fps)
+        if (nextFrame >= this.nbFrames) return
+
+        this.rawPlayer.goNextFrame()
+        if (this.isComparing) this.syncComparisonPlayer()
+        const annotation = this.getAnnotation(this.rawPlayer.getCurrentTime())
+        if (annotation) this.loadSingleAnnotation(annotation)
+      }
+    },
+
+    setFullPlayerTime(newTime) {
+      if (!this.currentEntity) return
+      this.fullPlayer.currentTime = newTime
+      this.setPlaylistProgress(newTime)
+      const entityTime = newTime - this.currentEntity.start_duration
+      const frame = entityTime * this.fps
+      this.progress.updateProgressBar(frame + 1)
     },
 
     setFullScreen() {
@@ -537,7 +649,7 @@ export const playerMixin = {
 
     isFullScreen() {
       return !!(
-        document.fullScreen ||
+        document.fullscreen ||
         document.webkitIsFullScreen ||
         document.mozFullScreen ||
         document.msFullscreenElement ||
@@ -557,7 +669,7 @@ export const playerMixin = {
       }
     },
 
-    onProgressChanged(frameNumber) {
+    onProgressChanged(frameNumber, updatePlaylistProgress = true) {
       this.clearCanvas()
       this.rawPlayer.setCurrentFrame(frameNumber)
       this.syncComparisonPlayer()
@@ -565,6 +677,16 @@ export const playerMixin = {
       if (annotation) this.loadAnnotation(annotation)
       this.sendUpdatePlayingStatus()
       this.onFrameUpdate(frameNumber)
+      if (this.isFullMode && updatePlaylistProgress) {
+        const start = this.currentEntity.start_duration
+        const time = (frameNumber - 1) / this.fps + start
+        this.fullPlayer.currentTime = time
+        this.playlistProgress = time
+      } else {
+        setTimeout(() => {
+          this.updateProgressBar()
+        }, 200)
+      }
     },
 
     onHandleInChanged({ frameNumber, save }) {
@@ -664,7 +786,7 @@ export const playerMixin = {
           event.stopPropagation()
           // ctrl + shift + left
           if (
-            event.ctrlKey &&
+            (event.ctrlKey || event.metaKey) &&
             event.shiftKey &&
             this.moveSelectedEntityToLeft
           ) {
@@ -677,7 +799,7 @@ export const playerMixin = {
           event.stopPropagation()
           // ctrl + shift + right
           if (
-            event.ctrlKey &&
+            (event.ctrlKey || event.metaKey) &&
             event.shiftKey &&
             this.moveSelectedEntityToLeft
           ) {
@@ -699,15 +821,19 @@ export const playerMixin = {
           event.preventDefault()
           event.stopPropagation()
           this.onPlayNextEntityClicked()
-        } else if (event.ctrlKey && event.keyCode === 67) {
+        } else if ((event.ctrlKey || event.metaKey) && event.keyCode === 67) {
           // ctrl + c
           this.copyAnnotations()
-        } else if (event.ctrlKey && event.keyCode === 86) {
+        } else if ((event.ctrlKey || event.metaKey) && event.keyCode === 86) {
           // ctrl + v
           this.pasteAnnotations()
-        } else if (event.ctrlKey && event.altKey && event.keyCode === 68) {
+        } else if (
+          (event.ctrlKey || event.metaKey) &&
+          event.altKey &&
+          event.keyCode === 68
+        ) {
           this.onAnnotateClicked()
-        } else if (event.ctrlKey && event.keyCode === 90) {
+        } else if ((event.ctrlKey || event.metaKey) && event.keyCode === 90) {
           this.undoLastAction()
         } else if (event.altKey && event.keyCode === 82) {
           this.redoLastAction()
@@ -741,6 +867,7 @@ export const playerMixin = {
 
     onFilmClicked() {
       this.isEntitiesHidden = !this.isEntitiesHidden
+      window.dispatchEvent(new Event('resize'))
       this.$nextTick(() => {
         this.resetHeight()
         this.reloadAnnotations()
@@ -749,7 +876,8 @@ export const playerMixin = {
     },
 
     getCurrentTime() {
-      return roundToFrame(this.currentTimeRaw, this.fps) || 0
+      const time = roundToFrame(this.currentTimeRaw, this.fps) || 0
+      return Number(time.toPrecision(4))
     },
 
     setCurrentTimeRaw(time) {
@@ -758,7 +886,9 @@ export const playerMixin = {
       if (this.rawPlayer) {
         this.rawPlayer.setCurrentFrame(frameNumber)
         this.syncComparisonPlayer()
-        this.currentTimeRaw = roundedTime
+        const isChromium = !!window.chrome
+        const change = isChromium ? 0.0001 : 0
+        this.currentTimeRaw = Number((roundedTime + change).toPrecision(4))
         this.updateProgressBar()
       }
       return roundedTime
@@ -777,6 +907,7 @@ export const playerMixin = {
       if (!this.isCommentsHidden) {
         this.$refs['task-info'].$el.style.height = `${height}px`
       }
+      window.dispatchEvent(new Event('resize'))
       this.$nextTick(() => {
         this.$refs['task-info'].focusCommentTextarea()
         this.resetHeight()
@@ -804,13 +935,17 @@ export const playerMixin = {
     },
 
     setPlayerSpeed(rate) {
-      this.rawPlayer.setSpeed(rate)
+      if (this.rawPlayer) this.rawPlayer.setSpeed(rate)
       if (this.rawPlayerComparison) this.rawPlayerComparison.setSpeed(rate)
     },
 
     onFrameUpdate(frame) {
-      this.currentTimeRaw = frame * this.frameDuration
-      this.currentTime = this.formatTime(this.currentTimeRaw)
+      const isChromium = !!window.chrome
+      const change = isChromium ? 0.0001 : 0
+      this.currentTimeRaw = Number(
+        (frame * this.frameDuration + change).toPrecision(4)
+      )
+      this.currentTime = this.formatTime(this.currentTimeRaw, this.fps)
       this.updateProgressBar()
       const actions = this.onNextTimeUpdateActions
       actions.forEach(action => action())
@@ -844,7 +979,7 @@ export const playerMixin = {
       if (duration) {
         duration = floorToFrame(duration, this.fps)
         this.maxDurationRaw = duration
-        this.maxDuration = this.formatTime(duration)
+        this.maxDuration = this.formatTime(duration, this.fps)
         this.resetHandles()
       } else {
         this.maxDurationRaw = 0
@@ -919,8 +1054,15 @@ export const playerMixin = {
         } else if (this.isCurrentPreviewPicture && this.isAnnotationCanvas()) {
           if (this.canvas) {
             // Picture ratio
-            const naturalWidth = this.picturePlayer.naturalWidth
-            const naturalHeight = this.picturePlayer.naturalHeight
+
+            const naturalDimensions = this.currentPreview.width
+              ? {
+                  width: this.currentPreview.width,
+                  height: this.currentPreview.height
+                }
+              : this.picturePlayer.getNaturalDimensions()
+            const naturalWidth = naturalDimensions.width
+            const naturalHeight = naturalDimensions.height
             const ratio = naturalWidth / naturalHeight
 
             if (!this.$refs['video-container']) return Promise.resolve()
@@ -1101,7 +1243,7 @@ export const playerMixin = {
       }
     },
 
-    onMetadataLoaded(event) {
+    onMetadataLoaded() {
       this.$nextTick(() => {
         this.resetCanvasSize()
         if (this.resetHeight) this.resetHeight()
@@ -1132,7 +1274,7 @@ export const playerMixin = {
 
     onCanvasMouseMoved(event) {
       if (this.isCurrentPreviewMovie && this.$options.scrubbing) {
-        const x = event.e.clientX
+        const x = this.getClientX(event)
         if (x - this.$options.scrubStartX < 0) {
           this.goPreviousFrame()
         } else {
@@ -1145,39 +1287,28 @@ export const playerMixin = {
     onCanvasClicked(event) {
       if (event.button > 1 && this.isCurrentPreviewMovie) {
         this.$options.scrubbing = true
-        this.$options.scrubStartX = event.e.clientX
+        this.$options.scrubStartX = this.getClientX(event)
         this.$options.scrubStartTime = Number(this.currentTimeRaw)
       }
       return false
     },
 
-    onCanvasReleased(event) {
+    onCanvasReleased() {
       if (this.isCurrentPreviewMovie && this.$options.scrubbing) {
         this.$options.scrubbing = false
       }
       return false
     },
 
-    onTimeCodeClicked({
-      versionRevision,
-      minutes,
-      seconds,
-      milliseconds,
-      frame
-    }) {
+    onTimeCodeClicked({ versionRevision, frame }) {
       const previews = this.currentEntity.preview_files[this.task.task_type_id]
       const previewFile = previews.find(
         p => p.revision === parseInt(versionRevision)
       )
       this.onPreviewChanged(this.currentEntity, previewFile)
-      const time =
-        parseInt(minutes) * 60 +
-        parseInt(seconds) +
-        parseInt(milliseconds) / 1000
       setTimeout(() => {
-        const frameNumber = time / this.frameDuration
-        this.rawPlayer.setCurrentFrame(frameNumber)
-        this.onFrameUpdate(frameNumber)
+        this.rawPlayer.setCurrentFrame(frame)
+        this.onFrameUpdate(frame)
         this.syncComparisonPlayer()
       }, 20)
     },
@@ -1245,7 +1376,6 @@ export const playerMixin = {
 
   watch: {
     isCommentsHidden() {
-      if (!this.isCommentsHidden) this.$refs['task-info'].loadTaskData()
       if (this.isCurrentPreviewSound) {
         this.soundPlayer.redraw()
       }

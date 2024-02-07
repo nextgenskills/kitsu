@@ -9,10 +9,7 @@
               :can-save="true"
               :active="isSearchActive"
               @change="onSearchChange"
-              @enter="
-                query =>
-                  isLongShotList ? applySearch(query) : saveShotSearch(query)
-              "
+              @enter="applySearch(searchField.getValue())"
               @save="saveSearchQuery"
               placeholder="ex: e01 s01 anim=wip"
             />
@@ -28,7 +25,7 @@
               v-if="currentEpisode && currentEpisode.description"
             />
             <div class="filler"></div>
-            <div class="flexrow flexrow-item" v-if="!isCurrentUserClient && !isSimpleMode">
+            <div class="flexrow flexrow-item" v-if="!isCurrentUserClient">
               <combobox-department
                 class="combobox-department flexrow-item"
                 :selectable-departments="selectableDepartments('Shot')"
@@ -77,7 +74,10 @@
 
           <div class="query-list">
             <search-query-list
+              :groups="shotSearchFilterGroups"
+              :is-group-enabled="true"
               :queries="shotSearchQueries"
+              type="shot"
               @change-search="changeSearch"
               @remove-search="removeSearchQuery"
               v-if="!isShotsLoading && !initialLoading"
@@ -229,6 +229,7 @@
       :active="modals.isEDLImportDisplayed"
       :is-loading="loading.importing"
       :is-error="errors.importing"
+      :import-error="errors.importingError"
       @cancel="hideEDLImportModal"
       @confirm="uploadEDLFile"
     />
@@ -259,6 +260,7 @@
 
     <add-thumbnails-modal
       ref="add-thumbnails-modal"
+      entity-type="Shot"
       parent="shots"
       :active="modals.isAddThumbnailsDisplayed"
       :is-loading="loading.addThumbnails"
@@ -365,9 +367,9 @@ export default {
         'FPS'
       ],
       genericColumns: [
-        'metadata_column_name => text value',
-        'task_type_name => task_status_name',
-        'task_type_name comment => comment text'
+        'Metadata column name (text value)',
+        'Task type name (task status name value)',
+        'Task type name + comment (text value)'
       ],
       parsedCSV: [],
       selectedDepartment: 'ALL',
@@ -402,6 +404,7 @@ export default {
         del: false,
         importing: false,
         restore: false,
+        savingSearch: false,
         stay: false
       },
       pageName: 'Shots',
@@ -427,7 +430,7 @@ export default {
   mounted() {
     let searchQuery = ''
     if (this.$route.query.search && this.$route.query.search.length > 0) {
-      searchQuery = '' + this.$route.query.search
+      searchQuery = `${this.$route.query.search}`
     }
     this.$refs['shot-search-field'].setValue(searchQuery)
     const finalize = () => {
@@ -494,13 +497,13 @@ export default {
       'shotsCsvFormData',
       'shotSearchQueries',
       'shotSearchText',
+      'shotSearchFilterGroups',
       'shotsPath',
       'shotValidationColumns',
       'shotListScrollPosition',
       'shotSorting',
       'taskTypeMap',
-      'user',
-      'isSimpleMode'
+      'user'
     ]),
 
     searchField() {
@@ -512,11 +515,11 @@ export default {
     },
 
     renderColumns() {
-      var collection = [...this.dataMatchers, ...this.optionalColumns]
+      const collection = [...this.dataMatchers, ...this.optionalColumns]
 
       this.productionShotTaskTypes.forEach(item => {
         collection.push(item.name)
-        collection.push(item.name + ' comment')
+        collection.push(`${item.name} comment`)
       })
 
       return collection
@@ -730,7 +733,7 @@ export default {
           taskId: form.task.id,
           commentText: '',
           taskStatusId: form.task.task_status_id,
-          form: form
+          form
         })
           .then(({ newComment, preview }) => {
             return this.setPreview({
@@ -761,7 +764,7 @@ export default {
         })
         .catch(err => {
           this.errors.creatingTasks = true
-          console.errror(err)
+          console.error(err)
         })
     },
 
@@ -774,7 +777,7 @@ export default {
         })
         .catch(err => {
           this.errors.creatingTasks = true
-          console.errror(err)
+          console.error(err)
         })
     },
 
@@ -813,27 +816,24 @@ export default {
         return this.$t('shots.delete_text', { name: shot.name })
       } else if (shot) {
         return this.$t('shots.cancel_text', { name: shot.name })
-      } else {
-        return ''
       }
+      return ''
     },
 
     deleteAllTasksText() {
       const taskType = this.taskTypeForTaskDeletion
       if (taskType) {
         return this.$t('tasks.delete_all_text', { name: taskType.name })
-      } else {
-        return ''
       }
+      return ''
     },
 
     restoreText() {
       const shot = this.shotToRestore
       if (shot) {
         return this.$t('shots.restore_text', { name: shot.name })
-      } else {
-        return ''
       }
+      return ''
     },
 
     renderImport(data, mode) {
@@ -861,20 +861,22 @@ export default {
 
       this.loading.importing = true
       this.errors.importing = false
+      this.errors.importingError = null
       this.$store.commit('SHOT_CSV_FILE_SELECTED', formData)
 
       this.uploadShotFile(toUpdate)
         .then(() => {
-          this.loading.importing = false
           this.loadEpisodes().catch(console.error)
           this.hideImportRenderModal()
           this.loadShots()
         })
         .catch(err => {
           console.error(err)
-          this.loading.importing = false
-          this.loading.importingError = err
+          this.errors.importingError = err
           this.errors.importing = true
+        })
+        .finally(() => {
+          this.loading.importing = false
         })
     },
 
@@ -921,7 +923,15 @@ export default {
     },
 
     saveSearchQuery(searchQuery) {
-      this.saveShotSearch(searchQuery).catch(console.error)
+      if (this.loading.savingSearch) {
+        return
+      }
+      this.loading.savingSearch = true
+      this.saveShotSearch(searchQuery)
+        .catch(console.error)
+        .finally(() => {
+          this.loading.savingSearch = false
+        })
     },
 
     removeSearchQuery(searchQuery) {
@@ -1075,19 +1085,21 @@ export default {
 
       this.loading.importing = true
       this.errors.importing = false
+      this.errors.importingError = null
 
       this.uploadEdlFile({ edl_file, namingConvention, matchCase })
         .then(() => {
-          this.loading.importing = false
           this.loadEpisodes().catch(console.error)
           this.hideEDLImportModal()
           this.loadShots()
         })
         .catch(err => {
           console.error(err)
-          this.loading.importing = false
-          this.loading.importingError = err
+          this.errors.importingError = err
           this.errors.importing = true
+        })
+        .finally(() => {
+          this.loading.importing = false
         })
     }
   },
@@ -1145,7 +1157,7 @@ export default {
       if (!this.isShotsLoading) {
         let searchQuery = ''
         if (this.$route.query.search && this.$route.query.search.length > 0) {
-          searchQuery = '' + this.$route.query.search
+          searchQuery = `${this.$route.query.search}`
         }
         this.initialLoading = false
         this.$refs['shot-search-field'].setValue(searchQuery)
@@ -1165,14 +1177,11 @@ export default {
         title:
           `${this.currentProduction ? this.currentProduction.name : ''}` +
           ` - ${this.currentEpisode ? this.currentEpisode.name : ''}` +
-          ` | ${this.$t('shots.title')} - NextGen:RISE`
+          ` | ${this.$t('shots.title')} - Kitsu`
       }
-    } else {
-      return {
-        title: `${this.currentProduction.name} ${this.$t(
-          'shots.title'
-        )} - NextGen:RISE`
-      }
+    }
+    return {
+      title: `${this.currentProduction.name} ${this.$t('shots.title')} - Kitsu`
     }
   }
 }

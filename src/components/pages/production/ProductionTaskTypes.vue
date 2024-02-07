@@ -31,33 +31,13 @@
 
       <div
         v-else
-        v-for="(taskListObject, index) in [
-          assetTaskTypes,
-          shotTaskTypes,
-          editTaskTypes,
-          sequenceTaskTypes,
-          episodeTaskTypes
-        ]"
+        v-for="(taskListObject, index) in taskTypeGroups"
         :key="index"
       >
         <h2 class="section-title">
           {{ taskListObject.title }}
         </h2>
         <table class="datatable list" v-if="taskListObject.list.length > 0">
-          <thead>
-            <tr>
-              <th class="name">
-                {{ $t('task_types.fields.name') }}
-              </th>
-              <!--th class="start-date">
-                {{ $t('productions.fields.start_date') }}
-              </th>
-              <th class="end-date">
-                {{ $t('productions.fields.end_date') }}
-              </th-->
-              <th class="remove"></th>
-            </tr>
-          </thead>
           <draggable
             v-model="taskListObject.list"
             draggable=".task-type"
@@ -76,6 +56,9 @@
             />
           </draggable>
         </table>
+        <p class="empty" v-if="taskListObject.list.length === 0">
+          {{ $t('task_types.no_task_types') }}
+        </p>
       </div>
     </div>
   </div>
@@ -162,6 +145,30 @@ export default {
           t => !this.currentProduction.task_types.includes(t.id)
         )
       )
+    },
+
+    isAssetsOnly() {
+      return this.currentProduction.production_type === 'assets'
+    },
+
+    isShotsOnly() {
+      return this.currentProduction.production_type === 'shots'
+    },
+
+    taskTypeGroups() {
+      let groups = []
+      if (!this.isShotsOnly) {
+        groups.push(this.assetTaskTypes)
+      }
+      if (!this.isAssetsOnly) {
+        groups = groups.concat([
+          this.shotTaskTypes,
+          this.editTaskTypes,
+          this.sequenceTaskTypes,
+          this.episodeTaskTypes
+        ])
+      }
+      return groups
     }
   },
 
@@ -399,5 +406,17 @@ td ::v-deep p.control.flexrow {
 
 h2 {
   border: 0;
+}
+
+.empty {
+  font-style: italic;
+}
+
+.task-type {
+  cursor: grab;
+}
+
+.task-type[draggable='true'] {
+  cursor: grabbing;
 }
 </style>

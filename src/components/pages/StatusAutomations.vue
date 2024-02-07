@@ -3,11 +3,21 @@
     <list-page-header
       :title="$t('status_automations.title')"
       :new-entry-label="$t('status_automations.new_status_automation')"
+      :is-exportable="isActiveTab"
+      @export-clicked="onExportClicked"
       @new-clicked="onNewClicked"
     />
 
+    <route-tabs
+      class="mt2"
+      :active-tab="activeTab"
+      :tabs="tabs"
+      route-name="status-automations"
+    />
+
     <status-automation-list
-      :entries="statusAutomations"
+      class="status-automation-list"
+      :entries="statusAutomationsList"
       :is-editable="true"
       :is-loading="loading.list"
       :is-error="errors.list"
@@ -38,10 +48,15 @@
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
-import StatusAutomationList from '@/components/lists/StatusAutomationList'
+
+import csv from '@/lib/csv'
+import stringHelpers from '@/lib/string'
+
 import DeleteModal from '@/components/modals/DeleteModal'
 import EditStatusAutomationModal from '@/components/modals/EditStatusAutomationModal'
 import ListPageHeader from '@/components/widgets/ListPageHeader'
+import RouteTabs from '@/components/widgets/RouteTabs'
+import StatusAutomationList from '@/components/lists/StatusAutomationList'
 
 export default {
   name: 'status-automations',
@@ -50,11 +65,13 @@ export default {
     DeleteModal,
     EditStatusAutomationModal,
     ListPageHeader,
+    RouteTabs,
     StatusAutomationList
   },
 
   data() {
     return {
+      activeTab: 'active',
       modals: {
         edit: false,
         del: false
@@ -69,13 +86,38 @@ export default {
         del: false,
         list: false
       },
+      tabs: [
+        {
+          name: 'active',
+          label: this.$t('main.active')
+        },
+        {
+          name: 'archived',
+          label: this.$t('main.archived')
+        }
+      ],
       statusAutomationToDelete: null,
       statusAutomationToEdit: null
     }
   },
 
   computed: {
-    ...mapGetters(['statusAutomations']),
+    ...mapGetters([
+      'statusAutomations',
+      'archivedStatusAutomations',
+      'taskStatusMap',
+      'taskTypeMap'
+    ]),
+
+    isActiveTab() {
+      return this.activeTab === 'active'
+    },
+
+    statusAutomationsList() {
+      return this.isActiveTab
+        ? this.statusAutomations
+        : this.archivedStatusAutomations
+    },
 
     deleteText() {
       const statusAutomation = this.statusAutomationToDelete
@@ -90,6 +132,7 @@ export default {
   },
 
   created() {
+    this.activeTab = this.$route.query.tab || 'active'
     this.loading.list = true
     this.errors.list = false
     this.loadStatusAutomations(err => {
@@ -145,6 +188,37 @@ export default {
         })
     },
 
+    onExportClicked() {
+      const name = stringHelpers.slugify(this.$t('status_automations.title'))
+      const headers = [
+        this.$t('main.type'),
+        this.$t('status_automations.fields.entity_type'),
+        this.$t('status_automations.fields.in_task_type'),
+        this.$t('status_automations.fields.in_task_status'),
+        this.$t('status_automations.fields.out_field_type'),
+        this.$t('status_automations.fields.out_task_type'),
+        this.$t('status_automations.fields.out_task_status')
+      ]
+      const entries = [headers].concat(
+        this.statusAutomations.map(statusAutomation => [
+          statusAutomation.type,
+          statusAutomation.entity_type,
+          this.taskTypeMap.get(statusAutomation.in_task_type_id)?.name,
+          this.taskStatusMap.get(statusAutomation.in_task_status_id)
+            ?.short_name,
+          statusAutomation.out_field_type === 'ready_for'
+            ? this.$t('status_automations.change_ready_for')
+            : this.$t('status_automations.change_status'),
+          this.taskTypeMap.get(statusAutomation.out_task_type_id)?.name,
+          statusAutomation.out_field_type === 'status'
+            ? this.taskStatusMap.get(statusAutomation.out_task_status_id)
+                ?.short_name
+            : undefined
+        ])
+      )
+      csv.buildCsvFile(name, entries)
+    },
+
     onNewClicked() {
       this.statusAutomationToEdit = {}
       this.errors.edit = false
@@ -166,7 +240,7 @@ export default {
 
   watch: {
     $route() {
-      this.handleModalsDisplay()
+      this.activeTab = this.$route.query.tab || 'active'
     }
   },
 
@@ -178,4 +252,8 @@ export default {
 }
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.status-automation-list {
+  margin-top: 0;
+}
+</style>

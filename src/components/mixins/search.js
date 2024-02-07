@@ -3,14 +3,6 @@
  * list.
  */
 export const searchMixin = {
-  created() {},
-
-  mounted() {},
-
-  beforeDestroy() {},
-
-  computed: {},
-
   methods: {
     changeSearch(searchQuery) {
       this.searchField.setValue(searchQuery.search_query)
@@ -19,9 +11,9 @@ export const searchMixin = {
       if (this.applySearch) this.applySearch(searchQuery.search_query)
     },
 
-    focusSearchField() {
+    focusSearchField(options) {
       if (this.searchField) {
-        this.searchField.focus()
+        this.searchField.focus(options)
       }
     },
 

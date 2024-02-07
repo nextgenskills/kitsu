@@ -28,7 +28,7 @@
           <page-subtitle :text="$t('sequences.tasks')" />
           <entity-task-list
             class="task-list"
-            :entries="currentTasks.map(t => t.id)"
+            :entries="currentTasks"
             :is-loading="!currentSequence"
             :is-error="false"
             @task-selected="onTaskSelected"
@@ -148,9 +148,8 @@
                       :empty-width="103"
                       :empty-height="103"
                       :with-link="false"
-                      :no-cache="true"
                     />
-                    <div>
+                    <div class="break-word">
                       {{ asset.asset_name }}
                       <span v-if="asset.nb_occurences > 1">
                         ({{ asset.nb_occurences }})
@@ -223,7 +222,7 @@
     </div>
 
     <div class="column side-column" v-if="currentTask">
-      <task-info :task="currentTask" />
+      <task-info :task="currentTask" entity-type="Sequence" with-actions />
     </div>
 
     <edit-sequence-modal

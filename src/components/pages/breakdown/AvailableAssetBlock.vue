@@ -13,12 +13,9 @@
     <div class="asset-add-10" @click="addTenAssets">+ 10</div>
     <div class="asset-picture" v-if="asset.preview_file_id.length > 0">
       <img
-        v-lazy="
-          '/api/pictures/thumbnails-square/preview-files/' +
-          asset.preview_file_id +
-          '.png'
-        "
+        loading="lazy"
         alt=""
+        :src="`/api/pictures/thumbnails-square/preview-files/${asset.preview_file_id}.png`"
       />
     </div>
     <div class="asset-picture" v-else>

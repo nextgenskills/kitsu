@@ -3,15 +3,25 @@
     <list-page-header
       :title="$t('task_status.title')"
       :new-entry-label="$t('task_status.new_task_status')"
+      :is-exportable="isActiveTab"
+      @export-clicked="onExportClicked"
       @new-clicked="onNewClicked"
     />
 
+    <route-tabs
+      class="mt2"
+      :active-tab="activeTab"
+      :tabs="tabs"
+      route-name="task-status"
+    />
+
     <task-status-list
-      :entries="taskStatus"
+      :entries="taskStatusList"
       :is-loading="loading.list"
       :is-error="errors.list"
       @edit-clicked="onEditClicked"
       @delete-clicked="onDeleteClicked"
+      @update-priorities="updatePriorities"
     />
 
     <edit-task-status-modal
@@ -37,9 +47,14 @@
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
+
+import csv from '@/lib/csv'
+import stringHelpers from '@/lib/string'
+
 import DeleteModal from '@/components/modals/DeleteModal'
 import EditTaskStatusModal from '@/components/modals/EditTaskStatusModal'
 import ListPageHeader from '@/components/widgets/ListPageHeader'
+import RouteTabs from '@/components/widgets/RouteTabs'
 import TaskStatusList from '@/components/lists/TaskStatusList'
 
 export default {
@@ -49,11 +64,13 @@ export default {
     DeleteModal,
     EditTaskStatusModal,
     ListPageHeader,
+    RouteTabs,
     TaskStatusList
   },
 
   data() {
     return {
+      activeTab: 'active',
       taskStatusToDelete: null,
       taskStatusToEdit: { color: '#000000' },
       modals: {
@@ -69,18 +86,47 @@ export default {
         edit: false,
         del: false,
         list: false
-      }
+      },
+      tabs: [
+        {
+          name: 'active',
+          label: this.$t('main.active')
+        },
+        {
+          name: 'archived',
+          label: this.$t('main.archived')
+        }
+      ]
     }
   },
 
-  computed: {
-    ...mapGetters(['taskStatus', 'taskStatusMap'])
+  mounted() {
+    this.activeTab = this.$route.query.tab || 'active'
   },
 
-  created() {},
+  computed: {
+    ...mapGetters(['archivedTaskStatus', 'taskStatus']),
+
+    isActiveTab() {
+      return this.activeTab === 'active'
+    },
+
+    taskStatusList() {
+      const taskStatusList = this.isActiveTab
+        ? this.taskStatus
+        : this.archivedTaskStatus
+      return [...taskStatusList].sort((a, b) => a.priority - b.priority)
+    }
+  },
 
   methods: {
-    ...mapActions(['deleteTaskStatus']),
+    ...mapActions(['deleteTaskStatus', 'updateTaskStatusPriority']),
+
+    async updatePriorities(taskStatuses) {
+      for (const taskStatus of taskStatuses) {
+        await this.updateTaskStatusPriority(taskStatus)
+      }
+    },
 
     confirmEditTaskStatus(form) {
       const isNew = !(this.taskStatusToEdit && this.taskStatusToEdit.id)
@@ -91,7 +137,7 @@ export default {
       }
 
       this.loading.edit = true
-      this.loading.del = false
+      this.errors.edit = false
       this.$store
         .dispatch(action, form)
         .then(() => {
@@ -129,6 +175,37 @@ export default {
       }
     },
 
+    onExportClicked() {
+      const name = stringHelpers.slugify(this.$t('task_status.title'))
+      const headers = [
+        this.$t('main.type'),
+        this.$t('task_status.fields.name'),
+        this.$t('task_status.fields.short_name'),
+        this.$t('task_status.fields.color'),
+        this.$t('task_status.fields.is_default'),
+        this.$t('task_status.fields.is_done'),
+        this.$t('task_status.fields.is_retake'),
+        this.$t('task_status.fields.is_artist_allowed'),
+        this.$t('task_status.fields.is_client_allowed'),
+        this.$t('task_status.fields.is_feedback_request')
+      ]
+      const entries = [headers].concat(
+        this.taskStatus.map(taskStatus => [
+          taskStatus.type,
+          taskStatus.name,
+          taskStatus.short_name,
+          taskStatus.color,
+          taskStatus.is_default,
+          taskStatus.is_done,
+          taskStatus.is_retake,
+          taskStatus.is_artist_allowed,
+          taskStatus.is_client_allowed,
+          taskStatus.is_feedback_request
+        ])
+      )
+      csv.buildCsvFile(name, entries)
+    },
+
     onNewClicked() {
       this.taskStatusToEdit = { color: '#000000' }
       this.modals.edit = true
@@ -145,7 +222,11 @@ export default {
     }
   },
 
-  watch: {},
+  watch: {
+    $route() {
+      this.activeTab = this.$route.query.tab || 'active'
+    }
+  },
 
   metaInfo() {
     return {
@@ -154,5 +235,3 @@ export default {
   }
 }
 </script>
-
-<style lang="scss" scoped></style>

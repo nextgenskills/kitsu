@@ -44,10 +44,16 @@
             v-model="form.phone"
           />
 
-          <div class="departments">
+          <div class="departments field">
             <label class="label">{{ $t('people.fields.departments') }}</label>
+            <p
+              class="empty mb1"
+              v-if="form.departments && form.departments.length === 0"
+            >
+              {{ $t('people.departments_empty') }}
+            </p>
             <div
-              class="department-element mb1"
+              class="department-element mb1 mt05"
               :key="departmentId"
               @click="removeDepartment(departmentId)"
               v-for="departmentId in form.departments"
@@ -66,7 +72,7 @@
                 v-if="selectableDepartments.length > 0"
               />
               <button
-                class="button is-success flexrow-item mb2"
+                class="button is-success flexrow-item"
                 :class="{
                   'is-disabled': selectedDepartment === null
                 }"
@@ -379,6 +385,11 @@ export default {
 }
 .is-danger {
   color: #ff3860;
+  font-style: italic;
+}
+
+.empty {
+  color: var(--text);
   font-style: italic;
 }
 </style>

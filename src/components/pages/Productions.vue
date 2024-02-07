@@ -93,16 +93,11 @@ export default {
       'isProductionsLoading',
       'isProductionsLoadingError',
       'productionAvatarFormData',
-      'productions',
-      'productionMap'
+      'productions'
     ]),
 
     currentLockText() {
-      if (this.productionToDelete) {
-        return this.productionToDelete.name
-      } else {
-        return ''
-      }
+      return this.productionToDelete?.name || ''
     }
   },
 

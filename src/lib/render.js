@@ -1,8 +1,16 @@
 import { marked } from 'marked'
+import { markedEmoji } from 'marked-emoji'
 import sanitizeHTML from 'sanitize-html'
-import { formatFrame, formatTime } from '@/lib/video'
+import { formatTime } from '@/lib/video'
+import emojis from '@/lib/emojis'
 
-export const TIME_CODE_REGEX = /v(\d+) (\d+):(\d+)\.(\d+) \((\d+)\)/g
+const options = {
+  emojis,
+  unicode: true
+}
+marked.use(markedEmoji(options))
+
+export const TIME_CODE_REGEX = /v(\d+) (\d+:)?(\d+):(\d+)(\.|:)(\d+) \((\d+)\)/g
 
 export const sanitize = html => {
   return sanitizeHTML(html, {
@@ -22,8 +30,16 @@ export const getTaskTypeStyle = task => {
   }
 }
 
-export const renderComment = (input, mentions, personMap, className = '') => {
+export const renderComment = (
+  input,
+  mentions,
+  departmentMentions,
+  personMap,
+  departmentMap,
+  className = ''
+) => {
   let compiled = marked.parse(input || '')
+  compiled = sanitize(compiled)
   if (mentions) {
     mentions.forEach(personId => {
       const person = personMap.get(personId)
@@ -32,21 +48,23 @@ export const renderComment = (input, mentions, personMap, className = '') => {
         `<a class="mention" href="/people/${person.id}">@${person.full_name}</a>`
       )
     })
+    departmentMentions.forEach(departmentId => {
+      const department = departmentMap.get(departmentId)
+      compiled = compiled.replaceAll(
+        `@${department.name}`,
+        `<span style="color: ${department.color}">@${department.name}</span>`
+      )
+    })
   }
-  compiled = sanitize(compiled)
 
   return compiled.replaceAll(
     TIME_CODE_REGEX,
-    (match, p1, p2, p3, p4, p5, offset, string) => {
-      return `<a
+    (match, version, hours, minutes, seconds, sep, subframes, frame) => {
+      return `<span
         class="timecode ${className}"
-        href="#"
-        data-version-revision="${p1}"
-        data-minutes="${p2}"
-        data-seconds="${p3}"
-        data-milliseconds="${p4}"
-        data-frame="${p5}"
-      >${match}</a>`
+        data-version-revision="${version}"
+        data-frame="${frame}"
+      >${match}</span>`
     }
   )
 }
@@ -59,14 +77,13 @@ export const renderMarkdown = input => {
 export const replaceTimeWithTimecode = (
   comment,
   currentPreviewRevision,
-  currentTimeRaw,
+  frame,
   fps
 ) => {
   if (comment) {
     const frameDuration = Math.round((1 / fps) * 10000) / 10000
-    const frameNumber = Math.floor(currentTimeRaw / frameDuration)
-    const frame = formatFrame(frameNumber + 1)
-    const formatedTime = formatTime(currentTimeRaw)
+    const currentTimeRaw = (frame - 1) * frameDuration
+    const formatedTime = formatTime(currentTimeRaw, fps)
     return comment.replaceAll(
       '@frame',
       `v${currentPreviewRevision} ${formatedTime} (${frame})`

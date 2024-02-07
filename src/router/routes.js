@@ -21,66 +21,69 @@ import TaskType from '@/components/pages/TaskType'
 import Todos from '@/components/pages/Todos'
 import Edits from '@/components/pages/Edits'
 
-const AssetTypes = () => import('@/components/pages/AssetTypes.vue')
 const Asset = () => import('@/components/pages/Asset.vue')
+const AssetTypes = () => import('@/components/pages/AssetTypes.vue')
+const Backgrounds = () => import('@/components/pages/Backgrounds.vue')
 const Breakdown = () => import('@/components/pages/Breakdown.vue')
+const Concepts = () => import('@/components/pages/Concepts.vue')
 const CustomActions = () => import('@/components/pages/CustomActions.vue')
-const FirstConnection = () => import('@/components/pages/FirstConnection.vue')
-const Episodes = () => import('@/components/pages/Episodes.vue')
+const Departments = () => import('@/components/pages/Departments.vue')
+const Edit = () => import('@/components/pages/Edit.vue')
+const EntitySearch = () => import('@/components/pages/EntitySearch.vue')
 const Episode = () => import('@/components/pages/Episode.vue')
+const Episodes = () => import('@/components/pages/Episodes.vue')
 const EpisodeStats = () => import('@/components/pages/EpisodeStats.vue')
+const FirstConnection = () => import('@/components/pages/FirstConnection.vue')
+const Logs = () => import('@/components/pages/Logs.vue')
 const MainSchedule = () => import('@/components/pages/MainSchedule.vue')
 const MyChecks = () => import('@/components/pages/MyChecks.vue')
 const NotFound = () => import('@/components/pages/NotFound.vue')
-const Person = () => import('@/components/pages/Person.vue')
 const People = () => import('@/components/pages/People.vue')
+const Person = () => import('@/components/pages/Person.vue')
 const Playlist = () => import('@/components/pages/Playlist.vue')
-const Productions = () => import('@/components/pages/Productions.vue')
 const ProductionAssetTypes = () =>
   import('@/components/pages/ProductionAssetTypes.vue')
+const ProductionQuota = () => import('@/components/pages/ProductionQuota.vue')
+const Productions = () => import('@/components/pages/Productions.vue')
 const ProductionSchedule = () =>
   import('@/components/pages/ProductionSchedule.vue')
-const ProductionQuota = () => import('@/components/pages/ProductionQuota.vue')
 const ProductionSettings = () =>
   import('@/components/pages/ProductionSettings.vue')
 const Profile = () => import('@/components/pages/Profile.vue')
 const ResetPassword = () => import('@/components/pages/ResetPassword.vue')
 const ResetChangePassword = () =>
   import('@/components/pages/ResetChangePassword.vue')
-const Logs = () => import('@/components/pages/Logs.vue')
-const EntitySearch = () => import('@/components/pages/EntitySearch.vue')
-const ServerDown = () => import('@/components/pages/ServerDown.vue')
-const Settings = () => import('@/components/pages/Settings.vue')
 const Sequence = () => import('@/components/pages/Sequence.vue')
 const Sequences = () => import('@/components/pages/Sequences.vue')
 const SequenceStats = () => import('@/components/pages/SequenceStats.vue')
+const ServerDown = () => import('@/components/pages/ServerDown.vue')
+const Settings = () => import('@/components/pages/Settings.vue')
 const Shot = () => import('@/components/pages/Shot.vue')
 const StatusAutomations = () =>
   import('@/components/pages/StatusAutomations.vue')
 const Task = () => import('@/components/pages/Task.vue')
-const Team = () => import('@/components/pages/Team.vue')
-const Timesheets = () => import('@/components/pages/Timesheets.vue')
-
 const TaskStatus = () => import('@/components/pages/TaskStatus.vue')
 const TaskTypes = () => import('@/components/pages/TaskTypes.vue')
-const Departements = () =>
-  import('@/components/pages/departments/Departments.vue')
+const Team = () => import('@/components/pages/Team.vue')
+const TeamSchedule = () => import('@/components/pages/TeamSchedule')
+const Timesheets = () => import('@/components/pages/Timesheets.vue')
 const WrongBrowser = () => import('@/components/pages/WrongBrowser.vue')
-const Edit = () => import('@/components/pages/Edit.vue')
 
 const ADMIN_PAGES = [
   'asset-types',
+  'backgrounds',
   'custom-actions',
-  'status-automations',
   'departments',
   'logs',
   'main-schedule',
   'people',
+  'newsfeed',
   'productions',
   'task-status',
   'task-types',
-  'main-schedule',
-  'settings'
+  'team-schedule',
+  'settings',
+  'status-automations'
 ]
 
 export const routes = [
@@ -91,12 +94,13 @@ export const routes = [
     beforeEnter: (to, from, next) => {
       const browser = Bowser.getParser(window.navigator.userAgent)
       const isValidBrowser = browser.satisfies({
-        chrome: '>20.1.1432',
-        firefox: '>31',
+        // see https://vitejs.dev/guide/build.html#browser-compatibility
+        chrome: '>=87',
+        firefox: '>=78',
         edge: '>90',
         vivaldi: '>2.8',
         opera: '>22',
-        safari: '>9'
+        safari: '>=14'
       })
       if (!isValidBrowser) {
         return next({ name: 'wrong-browser' })
@@ -178,72 +182,32 @@ export const routes = [
 
       {
         path: 'asset-types',
-        component: AssetTypes,
-        children: [
-          { path: 'new', component: AssetTypes },
-          {
-            name: 'edit-asset-type',
-            path: 'edit/:asset_type_id',
-            component: AssetTypes
-          },
-          {
-            name: 'delete-asset-type',
-            path: 'delete/:asset_type_id',
-            component: AssetTypes
-          }
-        ]
+        name: 'asset-types',
+        component: AssetTypes
+      },
+
+      {
+        path: 'backgrounds',
+        component: Backgrounds,
+        name: 'backgrounds'
       },
 
       {
         path: 'departments',
-        component: Departements,
-        name: 'departments'
+        name: 'departments',
+        component: Departments
       },
 
       {
         name: 'custom-actions',
         path: 'custom-actions',
-        component: CustomActions,
-        children: [
-          {
-            name: 'custom-actions-new',
-            path: 'new',
-            component: CustomActions
-          },
-          {
-            name: 'edit-custom-action',
-            path: 'edit/:custom_action_id',
-            component: CustomActions
-          },
-          {
-            name: 'delete-custom-action',
-            path: 'delete/:custom_action_id',
-            component: CustomActions
-          }
-        ]
+        component: CustomActions
       },
 
       {
         name: 'status-automations',
         path: 'status-automations',
-        component: StatusAutomations,
-        children: [
-          {
-            name: 'status-automations-new',
-            path: 'new',
-            component: StatusAutomations
-          },
-          {
-            name: 'edit-status-automation',
-            path: 'edit/:status_automation_id',
-            component: StatusAutomations
-          },
-          {
-            name: 'delete-status-automation',
-            path: 'delete/:status_automation_id',
-            component: StatusAutomations
-          }
-        ]
+        component: StatusAutomations
       },
 
       {
@@ -273,20 +237,7 @@ export const routes = [
       {
         path: 'people',
         component: People,
-        name: 'people',
-        children: [
-          { path: 'new', component: People, name: 'new-people' },
-          {
-            path: 'edit/:person_id',
-            component: People,
-            name: 'edit-person'
-          },
-          {
-            name: 'delete-person',
-            path: 'delete/:person_id',
-            component: People
-          }
-        ]
+        name: 'people'
       },
 
       {
@@ -306,6 +257,12 @@ export const routes = [
         path: '/main-schedule',
         component: MainSchedule,
         name: 'main-schedule'
+      },
+
+      {
+        path: '/team-schedule',
+        component: TeamSchedule,
+        name: 'team-schedule'
       },
 
       {
@@ -384,50 +341,18 @@ export const routes = [
       {
         name: 'task-types',
         path: 'task-types',
-        component: TaskTypes,
-        children: [
-          { path: 'new', component: TaskTypes },
-          {
-            name: 'edit-task-type',
-            path: 'edit/:task_type_id',
-            component: TaskTypes
-          },
-          {
-            name: 'delete-task-type',
-            path: 'delete/:task_type_id',
-            component: TaskTypes
-          }
-        ]
+        component: TaskTypes
       },
 
       {
         name: 'task-status',
         path: 'task-status',
-        component: TaskStatus,
-        children: [
-          {
-            name: 'new-task-status',
-            path: 'new',
-            component: TaskStatus
-          },
-          {
-            name: 'edit-task-status',
-            path: 'edit/:task_status_id',
-            component: TaskStatus
-          },
-          {
-            name: 'delete-task-status',
-            path: 'delete/:task_status_id',
-            component: TaskStatus
-          }
-        ]
+        component: TaskStatus
       },
-
       {
         path: 'my-tasks',
         component: Todos,
-        name: 'todos',
-        children: [{ path: ':tab', component: Todos, name: 'todos-tab' }]
+        name: 'todos'
       },
 
       {
@@ -604,6 +529,12 @@ export const routes = [
             name: 'breakdown-asset-type'
           }
         ]
+      },
+
+      {
+        path: 'productions/:production_id/concepts',
+        component: Concepts,
+        name: 'concepts'
       },
 
       {

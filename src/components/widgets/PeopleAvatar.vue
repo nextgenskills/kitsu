@@ -19,13 +19,14 @@
         }
       }"
       :title="person.full_name"
-      class="avatar-link"
     >
-      <img :src="avatarPath" v-if="person.has_avatar && noCache" />
-      <img v-lazy="avatarPath" :key="avatarKey" v-else-if="person.has_avatar" />
-      <span v-if="!person.has_avatar">
-        {{ initials }}
-      </span>
+      <img
+        :loading="this.isLazy ? 'lazy' : undefined"
+        alt=""
+        :src="person.avatarPath"
+        v-if="person.has_avatar"
+      />
+      <template v-else>{{ person.initials }}</template>
     </router-link>
   </span>
 
@@ -36,29 +37,25 @@
       background: person.color,
       width: size + 'px',
       height: size + 'px',
+      'min-width': size + 'px',
+      'min-height': size + 'px',
       'font-size': fontSize + 'px'
     }"
     v-else
   >
-    <img :src="avatarPath" v-if="person.has_avatar && noCache" />
-    <img v-lazy="avatarPath" :key="avatarKey" v-else-if="person.has_avatar" />
-    <span v-else>
-      {{ initials }}
-    </span>
+    <img
+      :loading="this.isLazy ? 'lazy' : undefined"
+      alt=""
+      :src="person.avatarPath"
+      v-if="person.has_avatar"
+    />
+    <template v-else>{{ person.initials }}</template>
   </span>
 </template>
 
 <script>
 export default {
-  name: 'person-avatar',
-
-  data() {
-    return {
-      avatarPath: '',
-      avatarKey: '',
-      initials: ''
-    }
-  },
+  name: 'people-avatar',
 
   props: {
     person: {
@@ -68,35 +65,21 @@ export default {
         color: '#FFF'
       })
     },
-    size: { type: Number, default: 40 },
-    'font-size': { type: Number, default: 18 },
-    'is-link': { type: Boolean, default: true },
-    'no-cache': { type: Boolean, default: false }
-  },
-
-  created() {
-    this.reloadAvatar()
-  },
-
-  methods: {
-    reloadAvatar() {
-      this.avatarPath =
-        this.person.avatarPath + '?unique=' + this.person.uniqueHash
-      this.avatarKey = this.person.id + '-' + this.person.uniqueHash
-    }
-  },
-
-  mounted() {
-    this.initials = this.person.initials
-  },
-
-  watch: {
-    person() {
-      this.reloadAvatar()
+    size: {
+      type: Number,
+      default: 40
     },
-
-    'person.uniqueHash'() {
-      this.reloadAvatar()
+    fontSize: {
+      type: Number,
+      default: 18
+    },
+    isLink: {
+      type: Boolean,
+      default: true
+    },
+    isLazy: {
+      type: Boolean,
+      default: true
     }
   }
 }
@@ -115,10 +98,6 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.avatar span {
-  flex: 1;
 }
 
 .avatar a {

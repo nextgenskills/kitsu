@@ -17,12 +17,6 @@ import {
   LOAD_PRODUCTION_STATUS_START,
   LOAD_PRODUCTION_STATUS_ERROR,
   LOAD_PRODUCTION_STATUS_END,
-  EDIT_PRODUCTION_START,
-  EDIT_PRODUCTION_ERROR,
-  EDIT_PRODUCTION_END,
-  DELETE_PRODUCTION_START,
-  DELETE_PRODUCTION_ERROR,
-  DELETE_PRODUCTION_END,
   ADD_PRODUCTION,
   UPDATE_PRODUCTION,
   REMOVE_PRODUCTION,
@@ -34,6 +28,9 @@ import {
   TEAM_REMOVE_PERSON,
   PRODUCTION_ADD_ASSET_TYPE,
   PRODUCTION_REMOVE_ASSET_TYPE,
+  PRODUCTION_ADD_BACKGROUND,
+  PRODUCTION_REMOVE_BACKGROUND,
+  PRODUCTION_UPDATE_DEFAULT_BACKGROUND,
   PRODUCTION_ADD_TASK_TYPE,
   PRODUCTION_REMOVE_TASK_TYPE,
   PRODUCTION_ADD_TASK_STATUS,
@@ -170,6 +167,18 @@ const getters = {
     }
   },
 
+  productionBackgrounds: (state, getters) => {
+    return getters.getProductionBackgrounds(state.currentProduction?.id)
+  },
+
+  getProductionBackgrounds: (state, rootState) => id => {
+    const production = state.productionMap.get(id)
+    const backgrounds = production?.preview_background_files?.map(id =>
+      rootState.backgroundMap.get(id)
+    )
+    return backgrounds ? sortByName(backgrounds) : []
+  },
+
   productionTaskStatuses: (state, getters, rootState) => {
     if (helpers.isEmptyArray(state.currentProduction, 'task_statuses')) {
       return rootState.taskStatus.taskStatus
@@ -258,6 +267,17 @@ const getters = {
     return production && production.production_type === 'tvshow'
   },
 
+  productionDepartmentIds: (state, getters) => {
+    const departmentIds = {}
+    return getters.productionTaskTypes.reduce((acc, type) => {
+      if (type.department_id && !departmentIds[type.department_id]) {
+        departmentIds[type.department_id] = true
+        acc.push(type.department_id)
+      }
+      return acc
+    }, [])
+  },
+
   productionAssetTypeOptions: (state, getters) => {
     return getters.productionAssetTypes
       .filter(assetType => assetType !== undefined)
@@ -287,15 +307,14 @@ const actions = {
     })
   },
 
-  loadOpenProductions({ commit, state }, callback) {
+  async loadOpenProductions({ commit }) {
     commit(LOAD_OPEN_PRODUCTIONS_START)
-    productionsApi.getOpenProductions((err, productions) => {
-      if (err) commit(LOAD_OPEN_PRODUCTIONS_ERROR)
-      else {
-        commit(LOAD_OPEN_PRODUCTIONS_END, productions)
-      }
-      if (callback) callback(err)
-    })
+    try {
+      const productions = await productionsApi.getOpenProductions()
+      commit(LOAD_OPEN_PRODUCTIONS_END, productions)
+    } catch (err) {
+      commit(LOAD_OPEN_PRODUCTIONS_ERROR)
+    }
   },
 
   loadProductions({ commit, state }, callback) {
@@ -321,25 +340,21 @@ const actions = {
   },
 
   newProduction({ commit, state }, data) {
-    commit(EDIT_PRODUCTION_START, data)
     return productionsApi.newProduction(data).then(production => {
-      commit(EDIT_PRODUCTION_END, production)
-      return Promise.resolve(production)
+      commit(ADD_PRODUCTION, production)
+      return production
     })
   },
 
   editProduction({ commit, state }, data) {
-    commit(EDIT_PRODUCTION_START)
     return productionsApi.updateProduction(data).then(production => {
-      commit(EDIT_PRODUCTION_END, production)
+      commit(UPDATE_PRODUCTION, production)
     })
   },
 
   deleteProduction({ commit, state }, production) {
-    commit(DELETE_PRODUCTION_START)
     return productionsApi.deleteProduction(production).then(() => {
       commit(REMOVE_PRODUCTION, production)
-      commit(DELETE_PRODUCTION_END)
     })
   },
 
@@ -480,15 +495,11 @@ const actions = {
   },
 
   deleteMetadataDescriptor({ commit, state }, descriptorId) {
-    return new Promise((resolve, reject) => {
-      return productionsApi
-        .deleteMetadataDescriptor(state.currentProduction.id, descriptorId)
-        .then(() => {
-          commit(DELETE_METADATA_DESCRIPTOR_END, { id: descriptorId })
-          resolve()
-        })
-        .catch(reject)
-    })
+    return productionsApi
+      .deleteMetadataDescriptor(state.currentProduction.id, descriptorId)
+      .then(() => {
+        commit(DELETE_METADATA_DESCRIPTOR_END, { id: descriptorId })
+      })
   },
 
   refreshMetadataDescriptor({ commit, state }, descriptorId) {
@@ -513,8 +524,39 @@ const actions = {
             descriptor
           })
         }
-        return Promise.resolve()
       })
+  },
+
+  async addBackgroundToProduction({ commit, state }, backgroundId) {
+    await productionsApi.addBackgroundToProduction(
+      state.currentProduction.id,
+      backgroundId
+    )
+    commit(PRODUCTION_ADD_BACKGROUND, backgroundId)
+  },
+
+  async removeBackgroundFromProduction({ commit, state }, backgroundId) {
+    try {
+      await productionsApi.removeBackgroundFromProduction(
+        state.currentProduction.id,
+        backgroundId
+      )
+      commit(PRODUCTION_REMOVE_BACKGROUND, backgroundId)
+    } catch (err) {
+      console.error(err)
+    }
+  },
+
+  async setDefaultBackgroundToProduction({ commit, state }, backgroundId) {
+    try {
+      await productionsApi.setDefaultBackgroundToProduction(
+        state.currentProduction.id,
+        backgroundId
+      )
+      commit(PRODUCTION_UPDATE_DEFAULT_BACKGROUND, backgroundId)
+    } catch (err) {
+      console.error(err)
+    }
   }
 }
 
@@ -582,93 +624,43 @@ const mutations = {
     state.productionStatusMap = productionStatusMap
   },
 
-  [EDIT_PRODUCTION_START](state, data) {},
-  [EDIT_PRODUCTION_ERROR](state) {},
-
-  [EDIT_PRODUCTION_END](state, newProduction) {
-    const productionStatus = state.productionStatusMap.get(
-      newProduction.project_status_id
-    )
-    const production = state.productions.find(
-      production => production.id === newProduction.id
-    )
-    const openProduction = state.openProductions.find(
-      openProduction => openProduction.id === newProduction.id
-    )
-    newProduction.project_status_name = productionStatus.name
-
-    if (production) {
-      const openProductionIndex = state.openProductions.findIndex(
-        openProduction => openProduction.id === newProduction.id
-      )
-      if (newProduction.project_status_id) {
-        // Status changed from open to close
-        if (
-          openProductionIndex >= 0 &&
-          production.project_status_id !== newProduction.project_status_id
-        ) {
-          state.openProductions.splice(openProductionIndex, 1)
-          // Status change from close to open
-        } else if (openProductionIndex < 0) {
-          state.openProductions = sortByName(state.openProductions)
-        }
-      }
-
-      if (
-        newProduction.production_type &&
-        newProduction.production_type !== production.production_type &&
-        newProduction.production_type === 'short'
-      ) {
-        production.first_episode_id = undefined
-        openProduction.first_episode_id = undefined
-      }
-
-      Object.assign(production, newProduction)
-      if (openProduction) Object.assign(openProduction, newProduction)
-      if (
-        state.currentProduction &&
-        state.currentProduction.id === newProduction.id
-      ) {
-        Object.assign(state.currentProduction, newProduction)
-      }
-    } else {
-      newProduction.team = []
-      newProduction.task_statuses = []
-      newProduction.asset_types = []
-      newProduction.task_types = []
-      newProduction.status_automations = []
-      state.productions.push(newProduction)
-      state.productionMap.set(newProduction.id, newProduction)
-      if (!openProduction) {
-        state.openProductions.push(newProduction)
-        state.openProductions = sortByName(state.openProductions)
-      }
-      state.productions = sortProductions(state.productions)
-    }
-  },
-
   [ADD_PRODUCTION](state, production) {
-    state.productions.push(production)
-    state.openProductions.push(production)
-    state.productions = sortProductions(state.productions)
-    state.openProductions = sortByName(state.openProductions)
-    state.productionMap.set(production.id, production)
-  },
-
-  [UPDATE_PRODUCTION](state, production) {
-    const previousProduction = state.productionMap.get(production.id)
     const productionStatus = state.productionStatusMap.get(
       production.project_status_id
     )
-    const openProduction = state.openProductions.find(
-      p => p.id === production.id
-    )
-    const isStatusChanged =
-      previousProduction.project_status_id !== productionStatus.id
-
     production.project_status_name = productionStatus.name
-    Object.assign(previousProduction, production)
-    if (openProduction) Object.assign(openProduction, production)
+    state.productions.push(production)
+    state.productionMap.set(production.id, production)
+    state.productionMap = new Map(state.productionMap) // for reactivity
+    state.openProductions.push(production)
+    state.productions = sortProductions(state.productions)
+    state.openProductions = sortByName(state.openProductions)
+  },
+
+  [UPDATE_PRODUCTION](state, production) {
+    const previousProduction = state.productions.find(
+      ({ id }) => id === production.id
+    )
+    const openProduction = state.openProductions.find(
+      ({ id }) => id === production.id
+    )
+    const productionStatus = state.productionStatusMap.get(
+      production.project_status_id
+    )
+
+    // status changed
+    const isStatusChanged =
+      previousProduction &&
+      previousProduction.project_status_id !== productionStatus.id
+    production.project_status_name = productionStatus.name
+
+    // update states
+    if (previousProduction) {
+      Object.assign(previousProduction, production)
+    }
+    if (openProduction) {
+      Object.assign(openProduction, production)
+    }
     if (isStatusChanged) {
       if (production.project_status_name === 'Open') {
         state.openProductions.push(previousProduction)
@@ -679,13 +671,11 @@ const mutations = {
         )
       }
     }
+    state.productionMap.set(production.id, production)
+    state.productionMap = new Map(state.productionMap) // for reactivity
     state.productions = sortProductions(state.productions)
     state.openProductions = sortByName(state.openProductions)
   },
-
-  [DELETE_PRODUCTION_START](state) {},
-
-  [DELETE_PRODUCTION_ERROR](state) {},
 
   [REMOVE_PRODUCTION](state, productionToDelete) {
     state.productions = removeModelFromList(
@@ -698,8 +688,6 @@ const mutations = {
     )
     state.productionMap.delete(productionToDelete.id)
   },
-
-  [DELETE_PRODUCTION_END](state, productionToDelete) {},
 
   [PRODUCTION_PICTURE_FILE_SELECTED](state, formData) {
     state.productionAvatarFormData = formData
@@ -781,6 +769,26 @@ const mutations = {
 
   [PRODUCTION_REMOVE_ASSET_TYPE](state, assetTypeId) {
     removeFromIdList(state.currentProduction, 'asset_types', assetTypeId)
+  },
+
+  [PRODUCTION_ADD_BACKGROUND](state, backgroundId) {
+    addToIdList(
+      state.currentProduction,
+      'preview_background_files',
+      backgroundId
+    )
+  },
+
+  [PRODUCTION_REMOVE_BACKGROUND](state, backgroundId) {
+    removeFromIdList(
+      state.currentProduction,
+      'preview_background_files',
+      backgroundId
+    )
+  },
+
+  [PRODUCTION_UPDATE_DEFAULT_BACKGROUND](state, backgroundId) {
+    state.currentProduction.default_preview_background_file_id = backgroundId
   },
 
   [PRODUCTION_ADD_TASK_STATUS](state, taskStatusId) {

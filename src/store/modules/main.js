@@ -7,6 +7,7 @@ import {
   TOGGLE_SUPPORT_CHAT,
   TOGGLE_SIMPLE_MODE,
   TOGGLE_USER_MENU,
+  SET_CONFIG,
   SET_LAST_PRODUCTION_SCREEN,
   SET_HELP_SECTION,
   SET_CURRENT_PRODUCTION,
@@ -25,7 +26,9 @@ const initialState = {
   lastProductionScreen: 'assets',
   lastProductionViewed: null,
   previewFileIdToShow: '',
-  helpSection: 'default'
+  helpSection: 'default',
+  mainConfig: {},
+  previewFileIdToShow: ''
 }
 
 const state = { ...initialState }
@@ -40,7 +43,9 @@ const getters = {
   lastProductionScreen: state => state.lastProductionScreen,
   lastProductionViewed: state => state.lastProductionViewed,
   previewFileIdToShow: state => state.previewFileIdToShow,
-  helpSection: state => state.helpSection
+  helpSection: state => state.helpSection,
+  mainConfig: state => state.mainConfig,
+
 }
 
 const actions = {
@@ -53,7 +58,7 @@ const actions = {
 
   setSupportChat({ commit, state }, isSupportChat) {
     commit(TOGGLE_SUPPORT_CHAT, isSupportChat)
-    crisp.setChatVisibilty(isSupportChat)
+    crisp.setChatVisibility(isSupportChat)
   },
 
   toggleSidebar({ commit, state }) {
@@ -76,11 +81,19 @@ const actions = {
     return client.getEvents(after, before)
   },
 
-  searchData(_, { query, limit, index_names }) {
-    if (!limit) {
-      limit = 3
+  async setMainConfig({ commit }) {
+    let config = {}
+    try {
+      config = await client.getConfig()
+    } catch (error) {
+      console.log(error)
     }
-    return client.searchData(query, limit, index_names)
+    commit(SET_CONFIG, config)
+    return config
+  },
+
+  searchData(_, { query, limit = 3, offset = 0, productionId, index_names }) {
+    return client.searchData(query, limit, offset, index_names, productionId)
   }
 }
 
@@ -125,6 +138,10 @@ const mutations = {
 
   [HIDE_PREVIEW_FILE](state) {
     state.previewFileIdToShow = ''
+  },
+
+  [SET_CONFIG](state, mainConfig) {
+    state.mainConfig = mainConfig
   },
 
   [RESET_ALL](state) {

@@ -54,7 +54,7 @@
               <div class="flexrow">
                 <at-sign-icon
                   class="icon flexrow-item"
-                  v-if="isMention(notification)"
+                  v-if="isMention(notification) || isReplyMention(notification)"
                 />
                 <message-square-icon
                   class="icon flexrow-item"
@@ -132,9 +132,14 @@
 
                   <span
                     class="explaination flexrow-item"
-                    v-if="isMention(notification)"
+                    v-if="
+                      isMention(notification) || isReplyMention(notification)
+                    "
                   >
                     {{ $t('notifications.mention_you_on') }}
+                    <template v-if="isReplyMention(notification)">
+                      (reply)
+                    </template>
                   </span>
 
                   <router-link
@@ -152,16 +157,21 @@
                   renderComment(
                     notification.comment_text,
                     notification.mentions,
-                    personMap
+                    notification.department_mentions || [],
+                    personMap,
+                    departmentMap
                   )
                 "
                 v-if="
                   isComment(notification) ||
                   isMention(notification) ||
+                  isReplyMention(notification) ||
                   notification.comment_text
                 "
               ></div>
-              <div v-if="isReply(notification)">...</div>
+              <div v-if="isReply(notification) || isReplyMention(notification)">
+                ...
+              </div>
               <div v-if="notification.preview_file_id">
                 <h3>
                   {{ $t('notifications.new_revision') }}
@@ -179,7 +189,9 @@
               <div
                 class="comment-text"
                 v-if="
-                  (isComment(notification) || isMention(notification)) &&
+                  (isComment(notification) ||
+                    isMention(notification) ||
+                    isReplyMention(notification)) &&
                   !notification.comment_text
                 "
               >
@@ -188,8 +200,16 @@
 
               <div
                 class="comment-text reply-text"
-                v-html="renderComment(notification.reply_text, [], personMap)"
-                v-if="isReply(notification)"
+                v-html="
+                  renderComment(
+                    notification.reply_text,
+                    notification.reply_mentions || [],
+                    notification.reply_department_mentions || [],
+                    personMap,
+                    departmentMap
+                  )
+                "
+                v-if="isReply(notification) || isReplyMention(notification)"
               ></div>
             </div>
           </div>
@@ -231,7 +251,7 @@ import TaskTypeName from '@/components/widgets/TaskTypeName'
 import ValidationTag from '@/components/widgets/ValidationTag'
 
 export default {
-  name: 'notification-page',
+  name: 'notifications',
   components: {
     AtSignIcon,
     ComboboxTaskType,
@@ -299,13 +319,13 @@ export default {
 
   computed: {
     ...mapGetters([
+      'departmentMap',
       'notifications',
       'personMap',
       'taskStatus',
       'taskTypes',
       'taskTypeMap',
       'taskStatusMap',
-      'personMap',
       'user'
     ]),
 
@@ -453,6 +473,8 @@ export default {
       )
     },
     isMention: notification => notification.notification_type === 'mention',
+    isReplyMention: notification =>
+      notification.notification_type === 'reply-mention',
     isReply: notification => notification.notification_type === 'reply'
   },
 
@@ -512,10 +534,6 @@ export default {
     background: $dark-grey-lighter;
     color: $white-grey;
     box-shadow: 0px 1px 1px 1px $dark-grey;
-
-    &.selected {
-      border-left: 6px solid $dark-purple;
-    }
   }
 
   .icon,
@@ -538,17 +556,22 @@ a {
 }
 
 .notification {
-  margin-bottom: 0.5em;
   align-items: flex-start;
   background: white;
+  border: 5px solid transparent;
+  border-radius: 1em;
   box-shadow: 0 0 4px $light-grey;
   cursor: pointer;
-  border-left: 6px solid transparent;
+  margin-bottom: 0.5em;
   padding-left: 0.7em;
+
+  &:hover {
+    background: var(--background-selectable);
+  }
 }
 
 .unread {
-  border-left: 6px solid $orange;
+  border-left: 5px solid $orange;
 }
 
 .person-name {
@@ -600,6 +623,7 @@ a {
 }
 
 .notification-line {
+  border-radius: 1em;
   align-items: start;
 }
 
@@ -615,7 +639,8 @@ a {
 }
 
 .selected {
-  border-left: 6px solid $purple;
+  border: 5px solid var(--background-selected);
+  transform: scale(1.01);
 }
 
 .columns {

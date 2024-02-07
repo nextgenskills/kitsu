@@ -1,6 +1,15 @@
 <template>
   <div class="entity-search page">
     <form class="search-form" @submit.prevent="onResultSelected()">
+      <div>
+        <combobox-production
+          class="flexrow-item production-field"
+          :label="$t('main.production')"
+          :production-list="productionList"
+          v-model="productionId"
+        />
+      </div>
+
       <div class="search-field">
         <span class="search-icon">
           <search-icon width="20" />
@@ -27,6 +36,7 @@
           @change="search"
           v-model="searchFilter.shots"
         />
+
         <div class="filler"></div>
         <span class="flexrow-item no-margin">
           {{ $t('search.limit') }}
@@ -94,9 +104,24 @@
               </router-link>
             </div>
           </div>
+          <p
+            class="has-text-centered mt2"
+            v-if="
+              results.assets.length !== 0 && results.assets.length % 12 === 0
+            "
+          >
+            <button
+              class="button is-link"
+              @click="loadMoreResults('assets')"
+              v-if="!isLoadingMoreAssets"
+            >
+              {{ $t('main.load_more') }}
+            </button>
+            <spinner v-else />
+          </p>
         </div>
         <div class="pb1" v-if="this.searchFilter.shots">
-          <h2 class="mt0">
+          <h2 class="mt1">
             {{ $t('shots.title') }} ({{ this.results.shots?.length || 0 }})
           </h2>
           <div class="has-text-centered" v-if="!this.results.shots?.length">
@@ -143,49 +168,20 @@
               </router-link>
             </div>
           </div>
-        </div>
-        <!--
-        <div class="pb1" v-if="this.searchFilter.persons">
-          <h2 class="mt0">
-            {{ $t('people.title') }} ({{ this.results.persons?.length || 0 }})
-          </h2>
-          <div class="has-text-centered" v-if="!this.results.persons.length">
-            {{ $t('main.search.no_result') }}
-          </div>
-          <div class="result-list" v-else>
-            <div
-              class="result flexcolumn"
-              :class="{
-                'selected-result': flattenResults[selectedIndex] === person
-              }"
-              :key="person.id"
-              @mouseover="selectResultById(person.id)"
-              v-for="person in this.results.persons"
+          <p
+            class="has-text-centered mt2"
+            v-if="results.shots.length !== 0 && results.shots.length % 12 === 0"
+          >
+            <button
+              class="button is-link"
+              @click="loadMoreResults('shots')"
+              v-if="!isLoadingMoreShots"
             >
-              <router-link
-                :id="`result-link-${person.id}`"
-                :to="personPath(person)"
-              >
-                <div class="flexcolumn has-text-centered">
-                  <people-avatar
-                    class="mauto"
-                    :is-link="false"
-                    :person="person"
-                    :size="200"
-                  />
-                  <div class="result-description">
-                    <div class="person-name">{{ person.name }}</div>
-                    <div class="person-email">{{ person.email }}</div>
-                    <div class="person-role">
-                      {{ $t(`people.role.${person.role}`) }}
-                    </div>
-                  </div>
-                </div>
-              </router-link>
-            </div>
-          </div>
+              {{ $t('main.load_more') }}
+            </button>
+            <spinner v-else />
+          </p>
         </div>
-        -->
       </div>
     </div>
   </div>
@@ -199,16 +195,15 @@ import { mapGetters, mapActions } from 'vuex'
 import { getEntityPath, getPersonPath } from '@/lib/path'
 
 import { SearchIcon } from 'vue-feather-icons'
-
-// import peopleStore from '@/store/modules/people'
+import stringHelpers from '@/lib/string'
 
 import Checkbox from '@/components/widgets/Checkbox'
 import Combobox from '@/components/widgets/Combobox'
+import ComboboxProduction from '@/components/widgets/ComboboxProduction'
 import EntityPreview from '@/components/widgets/EntityPreview'
-// import PeopleAvatar from '@/components/widgets/PeopleAvatar'
 import Spinner from '@/components/widgets/Spinner'
 
-const AVAILABLE_LIMITS = [10, 20, 50]
+const AVAILABLE_LIMITS = [12, 24, 48]
 
 export default {
   name: 'entity-search',
@@ -217,8 +212,8 @@ export default {
   components: {
     Checkbox,
     Combobox,
+    ComboboxProduction,
     EntityPreview,
-    // PeopleAvatar,
     SearchIcon,
     Spinner
   },
@@ -226,8 +221,11 @@ export default {
   data() {
     return {
       isLoading: false,
+      isLoadingMoreAssets: false,
+      isLoadingMoreShots: false,
       limit: AVAILABLE_LIMITS[0],
       limitOptions: AVAILABLE_LIMITS.map(value => ({ label: value, value })),
+      productionId: '',
       selectedIndex: 0,
       searchQuery: '',
       searchFilter: {
@@ -247,10 +245,12 @@ export default {
 
   mounted() {
     window.addEventListener('keydown', event => {
-      if (event.ctrlKey && event.altKey && event.keyCode === 70) {
-        if (this.$refs['search-field']) {
-          this.$refs['search-field'].focus()
-        }
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.altKey &&
+        event.keyCode === 70
+      ) {
+        this.searchField.focus()
       } else if (event.keyCode === 40) {
         this.selectNext()
       } else if (event.keyCode === 38) {
@@ -266,7 +266,7 @@ export default {
   },
 
   computed: {
-    ...mapGetters(['productionMap']),
+    ...mapGetters(['openProductions', 'productionMap']),
 
     searchField() {
       return this.$refs['search-field']
@@ -291,6 +291,15 @@ export default {
         !this.searchFilter.assets && !this.searchFilter.shots
         // && !this.searchFilter.persons
       )
+    },
+
+    productionList() {
+      return [
+        {
+          id: '',
+          name: this.$t('main.all')
+        }
+      ].concat([...this.openProductions])
     }
   },
 
@@ -306,6 +315,7 @@ export default {
       this.searchData({
         query: this.searchQuery,
         limit: this.limit,
+        productionId: this.productionId,
         index_names
       })
         .then(results => {
@@ -315,6 +325,29 @@ export default {
         .catch(console.error)
         .finally(() => {
           this.isLoading = false
+        })
+    },
+
+    loadMoreResults(indexName) {
+      const index_names = [indexName]
+      const loadingField = `isLoadingMore${stringHelpers.capitalize(indexName)}`
+      this[loadingField] = true
+
+      this.searchData({
+        query: this.searchQuery,
+        limit: this.limit,
+        offset: this.results[indexName].length,
+        productionId: this.productionId,
+        index_names
+      })
+        .then(results => {
+          this.results[indexName] = this.results[indexName].concat(
+            results[indexName]
+          )
+        })
+        .catch(console.error)
+        .finally(() => {
+          this[loadingField] = false
         })
     },
 
@@ -373,23 +406,18 @@ export default {
     },
 
     getMatchDetails(entity) {
-      const target = entity.matched_terms?.[0]?.[0]
-      const term = entity.matched_terms?.[0]?.[1]
-      if (target?.startsWith('data_')) {
-        return this.$t('search.match_details_2', {
-          term,
-          target: target.replace('data_', '')
-        })
-      } else {
-        return this.$t('search.match_details', {
-          term,
-          target
-        })
-      }
+      const target = entity.matched_terms.join(', ')
+      return this.$t('search.match_details', {
+        target
+      })
     }
   },
 
   watch: {
+    productionId() {
+      this.search()
+    },
+
     searchQuery() {
       if (this.searchQuery.length) {
         this.$router.push({ query: { search: this.searchQuery } })
@@ -426,7 +454,7 @@ export default {
 }
 
 .search-field {
-  padding-top: 40px;
+  padding-top: 0;
   position: relative;
   width: 100%;
 
@@ -440,9 +468,14 @@ export default {
     position: absolute;
     color: $grey;
     z-index: 4;
-    top: 55px;
+    top: 15px;
     left: 10px;
   }
+}
+
+.production-field {
+  margin-bottom: 1em;
+  margin-top: 1em;
 }
 
 .search-options {

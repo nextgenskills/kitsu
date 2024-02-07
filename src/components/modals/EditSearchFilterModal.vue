@@ -17,17 +17,22 @@
           <text-field
             ref="nameField"
             :label="$t('assets.fields.name')"
-            v-model="form.name"
+            v-model.trim="form.name"
             @enter="runConfirmation"
             v-focus
           />
 
           <text-field
-            ref="nameField"
             :label="$t('main.search_query')"
-            v-model="form.search_query"
+            v-model.trim="form.search_query"
             @enter="runConfirmation"
-            v-focus
+          />
+
+          <combobox
+            :label="$t('main.filter_group')"
+            :options="groupOptions"
+            v-model="form.search_filter_group_id"
+            v-if="isGroupEnabled"
           />
         </form>
 
@@ -49,14 +54,16 @@
    filter label when it's too complex to read or too long.
  */
 import { modalMixin } from '@/components/modals/base_modal'
-
-import TextField from '@/components/widgets/TextField'
 import ModalFooter from '@/components/modals/ModalFooter'
+
+import Combobox from '@/components/widgets/Combobox'
+import TextField from '@/components/widgets/TextField'
 
 export default {
   name: 'edit-search-filter-modal',
   mixins: [modalMixin],
   components: {
+    Combobox,
     ModalFooter,
     TextField
   },
@@ -70,6 +77,10 @@ export default {
       type: Boolean,
       default: false
     },
+    isGroupEnabled: {
+      type: Boolean,
+      default: false
+    },
     isLoading: {
       type: Boolean,
       default: false
@@ -77,31 +88,32 @@ export default {
     searchQueryToEdit: {
       type: Object,
       default: () => {}
+    },
+    groupOptions: {
+      type: Array,
+      default: () => []
     }
   },
 
   data() {
-    if (this.searchQueryToEdit && this.searchQueryToEdit.id) {
-      return {
-        form: {
-          text: this.searchQueryToEdit.text,
-          task_status_id: this.searchQueryToEdit.task_status_id
-        }
-      }
-    } else {
-      return {
-        form: {
-          text: '',
-          task_status_id: null
-        }
+    return {
+      form: {
+        id: null,
+        name: '',
+        search_filter_group_id: null,
+        search_query: '',
+        task_status_id: null
       }
     }
   },
 
-  computed: {},
-
   methods: {
     runConfirmation(event) {
+      if (!this.form.name.length) {
+        this.$refs.nameField.focus()
+        return
+      }
+
       if (!event || event.keyCode === 13 || !event.keyCode) {
         this.$emit('confirm', {
           id: this.searchQueryToEdit.id,
@@ -113,15 +125,19 @@ export default {
 
   watch: {
     searchQueryToEdit() {
-      if (this.searchQueryToEdit && this.searchQueryToEdit.id) {
+      if (this.searchQueryToEdit?.id) {
         this.form.id = this.searchQueryToEdit.id
         this.form.name = this.searchQueryToEdit.name
+        this.form.search_filter_group_id =
+          this.searchQueryToEdit.search_filter_group_id
         this.form.search_query = this.searchQueryToEdit.search_query
       } else {
         this.form = {
-          id: '',
+          id: null,
           name: '',
-          search_query: ''
+          search_filter_group_id: null,
+          search_query: '',
+          task_status_id: null
         }
       }
     },
@@ -136,5 +152,3 @@ export default {
   }
 }
 </script>
-
-<style lang="scss" scoped></style>

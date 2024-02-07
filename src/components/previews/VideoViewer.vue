@@ -1,13 +1,13 @@
 <template>
   <div
-    ref="container" class="video-player"
+    ref="container"
+    class="video-player"
     :style="{
       'border-top-left-radius': isRoundedTopBorder ? '10px' : '',
       'border-top-right-radius': isRoundedTopBorder ? '10px' : ''
     }"
   >
     <div
-      ref="video-wrapper"
       class="video-wrapper"
       :style="{
         'border-top-left-radius': isRoundedTopBorder ? '10px' : '',
@@ -20,22 +20,21 @@
       <video
         ref="movie"
         class="annotation-movie"
-        :style="{
-          display: isLoading ? 'none' : 'block',
-        }"
         :src="moviePath"
         :poster="posterPath"
         preload="auto"
         type="video/mp4"
+        v-show="!isLoading"
       ></video>
     </div>
   </div>
 </template>
 
 <script>
+import panzoom from 'panzoom'
 import { mapGetters } from 'vuex'
 
-import { formatFrame, formatTime, floorToFrame, ceilToFrame } from '@/lib/video'
+import { formatFrame } from '@/lib/video'
 import Spinner from '@/components/widgets/Spinner'
 
 import { domMixin } from '@/components/mixins/dom'
@@ -58,6 +57,10 @@ export default {
       default: false
     },
     isComparing: {
+      type: Boolean,
+      default: false
+    },
+    isComparisonOverlay: {
       type: Boolean,
       default: false
     },
@@ -85,6 +88,14 @@ export default {
       type: Boolean,
       default: false
     },
+    currentFrame: {
+      type: Number,
+      default: 0
+    },
+    nbFrames: {
+      type: Number,
+      default: 0
+    },
     preview: {
       type: Object,
       default: () => {}
@@ -98,6 +109,10 @@ export default {
       default: false
     },
     isRoundedTopBorder: {
+      type: Boolean,
+      default: false
+    },
+    panzoom: {
       type: Boolean,
       default: false
     }
@@ -114,7 +129,6 @@ export default {
   },
 
   mounted() {
-    if (!this.container) return
     this.$options.currentTimeCalls = []
 
     this.container.style.height = this.defaultHeight + 'px'
@@ -129,6 +143,7 @@ export default {
           this.onWindowResize()
           this.isLoading = false
           this.setCurrentTime(0)
+          this.setCurrentTimeRaw(0)
           this.$emit('video-loaded')
         }
         this.video.addEventListener(
@@ -138,12 +153,18 @@ export default {
           },
           false
         )
+        this.video.addEventListener('resize', this.resetSize)
+
         this.video.addEventListener('loadedmetadata', () => {
           this.configureVideo()
           this.onWindowResize()
-          this.isLoading = false
           this.setCurrentTime(0)
+          this.setCurrentTimeRaw(0)
           this.$emit('video-loaded')
+        })
+
+        this.video.addEventListener('canplay', () => {
+          this.isLoading = false
         })
 
         this.video.addEventListener('ended', () => {
@@ -151,45 +172,45 @@ export default {
         })
 
         this.video.addEventListener('error', err => {
-          console.error('An error occured while loading a video', err)
+          console.error('An error occurred while loading a video', err)
           this.$refs.movie.style.height = this.defaultHeight + 'px'
           this.isLoading = false
         })
 
-        this.video.addEventListener('seeking', () => {
-          console.log('seeking')
-        })
-
-        this.video.addEventListener('seeked', () => {
-          console.log('seeked')
-        })
-
-        this.video.addEventListener('canplay', () => {
-          console.log('canplay')
-        })
-
-        this.video.addEventListener('canplaythrough', () => {
-          console.log('canplaythrough')
-        })
-
-        this.video.addEventListener('seeked', () => {
-          console.log('seeked end')
+        this.video.addEventListener('loadstart', () => {
+          this.isLoading = true
         })
 
         this.video.addEventListener('stalled', () => {
-          console.log('load start')
           this.isLoading = true
+        })
+
+        this.video.addEventListener('waiting', () => {
+          if (this.name.indexOf('comparison') < 0) {
+            this.isLoading = true
+          }
         })
 
         window.addEventListener('resize', this.onWindowResize)
       }
     }, 0)
+
+    if (this.panzoom) {
+      this.panzoomInstance = panzoom(this.container, {
+        bounds: true,
+        boundsPadding: 0.2,
+        maxZoom: 5,
+        minZoom: 1
+      })
+      this.pausePanZoom()
+    }
   },
 
   beforeDestroy() {
     this.pause()
     window.removeEventListener('keydown', this.onKeyDown)
     window.removeEventListener('resize', this.onWindowResize)
+    this.panzoomInstance?.dispose()
   },
 
   computed: {
@@ -231,10 +252,6 @@ export default {
       return this.$refs.movie
     },
 
-    videoWrapper() {
-      return this.$refs['video-wrapper']
-    },
-
     moviePath() {
       if (this.extension === 'mp4' && this.isAvailable && !this.isHd) {
         return `/api/movies/low/preview-files/${this.preview.id}.mp4`
@@ -265,8 +282,6 @@ export default {
   methods: {
     formatFrame,
 
-    formatTime,
-
     getNaturalDimensions() {
       return {
         height: this.video.videoHeight,
@@ -276,7 +291,7 @@ export default {
 
     getDimensions() {
       const dimensions = this.getNaturalDimensions()
-      const ratio = dimensions.height / dimensions.width
+      const ratio = dimensions.height / dimensions.width || 1
       const fullWidth = this.container.offsetWidth
       const fullHeight = this.container.offsetHeight
       let width = fullWidth
@@ -297,8 +312,8 @@ export default {
       }
     },
 
-    setCurrentFrame(frameNumber) {
-      this.setCurrentTime(frameNumber * this.frameDuration)
+    setCurrentFrame(frame) {
+      this.setCurrentTime(frame * this.frameDuration)
     },
 
     setCurrentTimeRaw(currentTime) {
@@ -320,30 +335,13 @@ export default {
       } else {
         this.$options.running = true
         const currentTime = this.$options.currentTimeCalls.shift()
-        if (this.video.currentTime !== currentTime + this.frameDuration) {
-          // tweaks needed because the html video player is messy with frames
-          this.video.currentTime = currentTime + this.frameDuration + 0.01
-          this.onTimeUpdate()
+        if (this.video.currentTime !== currentTime) {
+          this.video.currentTime = Number(currentTime.toPrecision(4))
         }
         setTimeout(() => {
           this.runSetCurrentTime()
         }, 10)
       }
-    },
-
-    _setRoundedTime(time, ceil = false) {
-      if (ceil) {
-        time = ceilToFrame(time, this.fps)
-      } else {
-        time = floorToFrame(time, this.fps)
-      }
-      if (time < this.frameDuration) {
-        time = 0
-      } else if (time > this.video.duration - this.frameDuration) {
-        time = this.video.duration - this.frameDuration
-      }
-      this.setCurrentTime(time)
-      return time
     },
 
     configureVideo() {
@@ -359,59 +357,85 @@ export default {
       this.videoDuration = this.video.duration
       this.isLoading = false
       this.$emit('duration-changed', this.videoDuration)
-      if (this.container) {
+      this.resetSize()
+      setTimeout(() => {
         this.resetSize()
-        setTimeout(() => {
-          this.resetSize()
-        })
-      }
+      }, 500)
     },
 
     resetSize() {
-      const dimensions = this.getDimensions()
-      const width = dimensions.width
-      const height = dimensions.height
+      let { width, height } = this.getDimensions()
       if (height > 0) {
         this.container.style.height = this.defaultHeight + 'px'
-        // Those two lines are commented out because fixing the width was
-        //   breaking the comment section in the preview in full screen
-        // this.videoWrapper.style.width = width + 'px'
-        // this.video.style.width = width + 'px'
-        this.videoWrapper.style.height = height + 'px'
         this.video.style.height = height + 'px'
-        this.$emit('size-changed', { width, height })
+        const videoPosition = this.video.getBoundingClientRect()
+        const containerPosition = this.container.getBoundingClientRect()
+        const top = videoPosition.top - containerPosition.top
+        const left = videoPosition.left - containerPosition.left
+        width = videoPosition.width
+        height = videoPosition.height
+
+        if (
+          !this.previousDimensions ||
+          this.previousDimensions.width !== width ||
+          this.previousDimensions.height !== height ||
+          this.previousDimensions.left !== left ||
+          this.previousDimensions.top !== top
+        ) {
+          this.$emit('size-changed', { width, height, top, left })
+        }
+        this.previousDimensions = { width, height, top, left }
+      } else {
+        this.$emit('size-changed', { width: 0, height: 0, top: 0, left: 0 })
       }
     },
 
-    onTimeUpdate() {
+    getFrameFromPlayer() {
+      let currentTimeRaw = 0
       if (this.video) {
-        this.currentTimeRaw = this.video.currentTime - this.frameDuration
+        currentTimeRaw = this.video.currentTime
       } else {
-        this.currentTimeRaw = 0 + this.frameDuration
+        currentTimeRaw = 0
       }
-      this.$emit(
-        'frame-update',
-        Math.round(this.currentTimeRaw / this.frameDuration)
-      )
+      let frame = Math.ceil(currentTimeRaw / this.frameDuration) + 1
+      frame = Number(frame.toPrecision(4))
+      frame = Math.min(frame, this.nbFrames)
+      return frame
+    },
+
+    play() {
+      if (
+        !this.isPlaying &&
+        this.videoDuration === this.video.currentTime &&
+        this.name.indexOf('comparison') < 0
+      ) {
+        this.setCurrentTime(0)
+      }
+      this.video.play()
+      if (this.name.indexOf('comarison') < 0) {
+        this.runEmitTimeUpdateLoop()
+      }
     },
 
     runEmitTimeUpdateLoop() {
       clearInterval(this.$options.playLoop)
-      this.$options.playLoop = setInterval(this.onTimeUpdate, 1000 / this.fps)
+      this.$options.playLoop = setInterval(
+        this.emitFrameChange,
+        Math.round(1000000 / (this.fps * 1000))
+      )
     },
 
-    play() {
-      if (!this.isPlaying && this.videoDuration === this.video.currentTime) {
-        this.setCurrentTime(0)
-      }
-      this.video.play()
-      this.runEmitTimeUpdateLoop()
+    emitFrameChange() {
+      const frame = this.getFrameFromPlayer()
+      this.$emit('frame-update', frame)
     },
 
     pause() {
       this.video.pause()
-      this._setRoundedTime(this.currentTimeRaw, true)
       clearInterval(this.$options.playLoop)
+      const frame = this.getFrameFromPlayer()
+      this.video.currentTime = frame * this.frameDuration
+      this.$emit('frame-update', frame)
     },
 
     toggleMute() {
@@ -419,15 +443,19 @@ export default {
     },
 
     goPreviousFrame() {
-      const time = this.getLastPushedCurrentTime()
-      const newTime = time - this.frameDuration
-      return this._setRoundedTime(newTime)
+      const nextFrame = this.currentFrame - 1
+      if (nextFrame < 0) return
+      this.video.currentTime = nextFrame * this.frameDuration
+      this.$emit('frame-update', nextFrame)
+      return nextFrame
     },
 
     goNextFrame() {
-      const time = this.getLastPushedCurrentTime()
-      const newTime = time + this.frameDuration
-      return this._setRoundedTime(newTime)
+      const nextFrame = this.currentFrame + 1
+      if (nextFrame >= this.nbFrames) return
+      this.video.currentTime = nextFrame * this.frameDuration
+      this.$emit('frame-update', nextFrame)
+      return nextFrame
     },
 
     onVideoEnd() {
@@ -443,34 +471,57 @@ export default {
     },
 
     onWindowResize() {
-      const now = new Date().getTime()
-      this.lastCall = this.lastCall || 0
-      if (now - this.lastCall > 600) {
-        this.lastCall = now
-        this.$nextTick(this.mountVideo)
-        setTimeout(() => {
-          this.mountVideo()
-        }, 400)
+      this.mountVideo()
+    },
+
+    resetPanZoom() {
+      if (this.panzoomInstance) {
+        this.panzoomInstance.moveTo(0, 0)
+        this.panzoomInstance.zoomAbs(0, 0, 1)
+      }
+    },
+
+    pausePanZoom() {
+      if (this.panzoomInstance) {
+        this.panzoomInstance.pause()
+      }
+    },
+
+    resumePanZoom() {
+      if (this.panzoomInstance) {
+        this.panzoomInstance.resume()
       }
     }
   },
 
   watch: {
     preview() {
+      this.resetPanZoom()
       this.maxDuration = '00:00.000'
       this.pause()
     },
 
     light() {
+      this.resetPanZoom()
       this.mountVideo()
     },
 
     isComparing() {
+      this.resetPanZoom()
+      this.mountVideo()
+    },
+
+    isComparingOverlay() {
+      this.resetPanZoom()
       this.mountVideo()
     },
 
     isMuted() {
       this.video.muted = this.isMuted
+    },
+
+    fullScreen() {
+      this.resetPanZoom()
     }
   }
 }
@@ -478,10 +529,13 @@ export default {
 
 <style lang="scss" scoped>
 .loading-background {
-  width: 100%;
-  height: 100%;
-  background: black;
+  background: #00000088;
+  position: absolute;
   display: flex;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   align-items: center;
   justify-content: center;
   text-align: center;
@@ -496,6 +550,10 @@ export default {
   flex-direction: column;
   align-content: flex-end;
   height: 100%;
+  width: 100%;
+  text-align: center;
+  background: #36393f;
+  overflow: hidden;
 }
 
 .video-wrapper {
@@ -507,16 +565,16 @@ export default {
   text-align: center;
   margin: auto;
   width: 100%;
+  height: 100%;
   position: relative;
-}
-
-.video-player {
-  width: 100%;
-  text-align: center;
-  background: #36393f;
 }
 
 video {
   object-fit: inherit;
+}
+
+.video-time {
+  position: absolute;
+  font-size: 2em;
 }
 </style>

@@ -108,6 +108,7 @@
             <div
               :key="dayList.length > 0 ? dayList[0].created_at : ''"
               v-for="dayList in newsListByDay(timezone)"
+              v-if="!loading.news"
             >
               <div class="has-text-centered subtitle timeline-entry">
                 <span class="big-dot"></span>
@@ -116,7 +117,7 @@
               <div
                 :key="'news-' + news.id"
                 :ref="'news-' + news.id"
-                v-for="news in dayList"
+                v-for="(news, index) in dayList"
               >
                 <div v-if="previewMode === 'comments'">
                   <div
@@ -275,10 +276,15 @@
                     v-if="previewMode == 'previews'"
                   >
                     <preview-player
+                      :canvas-id="`annotation-canvas-${dayList[0].created_at.substring(
+                        0,
+                        10
+                      )}-${index}`"
                       :previews="[
                         {
                           id: news.preview_file_id,
-                          extension: news.preview_file_extension
+                          extension: news.preview_file_extension,
+                          annotations: news.preview_file_annotations
                         }
                       ]"
                       :read-only="true"
@@ -294,11 +300,12 @@
       </div>
     </div>
 
-    <div
-      class="column side-column is-hidden-mobile hide-small-screen"
-      v-if="currentTask"
-    >
-      <task-info :task="currentTask" :is-loading="loading.currentTask" />
+    <div id="side-column" class="column side-column" v-if="currentTask">
+      <task-info
+        :task="currentTask"
+        :is-loading="loading.currentTask"
+        with-actions
+      />
     </div>
   </div>
 </template>
@@ -312,7 +319,7 @@
  */
 import { mapGetters, mapActions } from 'vuex'
 import moment from 'moment-timezone'
-import { sortByName } from '@/lib/sorting'
+import { sortByName, sortPeople } from '@/lib/sorting'
 import { formatFullDateWithRevertedTimezone } from '@/lib/time'
 import { timeMixin } from '@/components/mixins/time'
 
@@ -331,7 +338,7 @@ import ValidationTag from '@/components/widgets/ValidationTag'
 import PreviewPlayer from '@/components/previews/PreviewPlayer'
 
 export default {
-  name: 'news-page',
+  name: 'production-news-feed',
   mixins: [timeMixin],
   components: {
     Combobox,
@@ -441,7 +448,7 @@ export default {
 
     params() {
       const params = {
-        productionId: this.currentProduction.id,
+        productionId: this.currentProduction?.id,
         only_preview: this.previewMode === 'previews',
         page_size: this.previewMode === 'previews' ? 6 : 50,
         task_type_id: this.taskTypeId !== '' ? this.taskTypeId : undefined,
@@ -494,9 +501,8 @@ export default {
     },
 
     team() {
-      return this.currentProduction.team
-        .map(pId => this.personMap.get(pId))
-        .sort((a, b) => a.full_name.localeCompare(b.full_name))
+      const team = this.currentProduction?.team || []
+      return sortPeople(team.map(personId => this.personMap.get(personId)))
     },
 
     renderedStats() {
@@ -625,6 +631,7 @@ export default {
     },
 
     init() {
+      if (this.loading.news) return
       if (!this.$options.silent) {
         this.currentPage = 1
         this.loading.news = true
@@ -730,7 +737,7 @@ export default {
 
   watch: {
     currentProduction() {
-      if (!this.loading.news) this.init()
+      this.init()
     },
 
     previewMode() {

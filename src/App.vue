@@ -20,10 +20,13 @@
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
+
 import PreviewModal from '@/components/modals/PreviewModal'
 import Spinner from '@/components/widgets/Spinner'
+
 import crisp from '@/lib/crisp'
 import localPreferences from '@/lib/preferences'
+import sentry from '@/lib/sentry'
 
 export default {
   name: 'app',
@@ -39,6 +42,7 @@ export default {
       'assetTypeMap',
       'currentEpisode',
       'currentProduction',
+      'editMap',
       'episodeMap',
       'isCurrentUserAdmin',
       'isDataLoading',
@@ -61,7 +65,7 @@ export default {
     ])
   },
 
-  mounted() {
+  async mounted() {
     if (localStorage.getItem('dark-theme') === 'true' && !this.isDarkTheme) {
       this.$store.commit('TOGGLE_DARK_THEME')
       document.documentElement.style.background = '#36393F'
@@ -70,18 +74,23 @@ export default {
       document.documentElement.style.background = '#FFF'
       document.body.style.background = '#FFF'
     }
-    const supportChat = localPreferences.getBoolPreference('support:show', true)
-    this.setSupportChat(supportChat)
-    crisp.init(supportChat)
-  },
-
-  metaInfo: {
-    link: [
-      {
-        rel: 'icon',
-        href: '/static/favicon.ico'
-      }
-    ]
+    const config = await this.setMainConfig()
+    // Setup Crisp
+    if (config.crisp_token?.length) {
+      const supportChat = localPreferences.getBoolPreference(
+        'support:show',
+        true
+      )
+      this.setSupportChat(supportChat)
+      crisp.init(config.crisp_token)
+    }
+    // Setup Sentry
+    if (config.sentry?.dsn?.length) {
+      sentry.init(this.$router, {
+        dsn: config.sentry.dsn,
+        sampleRate: config.sentry.sampleRate
+      })
+    }
   },
 
   methods: {
@@ -91,6 +100,7 @@ export default {
       'loadAsset',
       'loadAssetType',
       'loadComment',
+      'loadEdit',
       'loadEpisode',
       'loadOpenProductions',
       'loadPerson',
@@ -102,6 +112,7 @@ export default {
       'loadTaskType',
       'refreshMetadataDescriptor',
       'removeAsset',
+      'setMainConfig',
       'setSupportChat'
     ]),
 
@@ -135,6 +146,24 @@ export default {
         document.documentElement.style.background = '#FFF'
         document.body.style.background = '#FFF'
       }
+    },
+
+    currentProduction: {
+      immediate: true,
+      handler() {
+        const userLocale = this.user?.locale.substring(0, 2)
+        const variant = this.currentProduction?.production_style
+        if (userLocale !== 'en') {
+          return
+        }
+        if (['nft', 'video-game'].includes(variant)) {
+          this.$i18n.silentFallbackWarn = true
+          this.$i18n.locale = `en_${variant}`
+        } else {
+          this.$i18n.silentFallbackWarn = false
+          this.$i18n.locale = 'en'
+        }
+      }
     }
   },
 
@@ -163,8 +192,7 @@ export default {
       'sequence:new'(eventData) {
         if (
           !this.sequenceMap.get(eventData.sequence_id) &&
-          this.currentProduction &&
-          this.currentProduction.id === eventData.project_id
+          this.currentProduction?.id === eventData.project_id
         ) {
           this.loadSequence(eventData.sequence_id)
         }
@@ -182,11 +210,31 @@ export default {
         }
       },
 
+      'edit:new'(eventData) {
+        if (
+          !this.editMap.get(eventData.edit_id) &&
+          this.currentProduction?.id === eventData.project_id
+        ) {
+          this.loadEdit(eventData.edit_id)
+        }
+      },
+
+      'edit:update'(eventData) {
+        if (this.editMap.get(eventData.edit_id)) {
+          this.loadEdit(eventData.edit_id)
+        }
+      },
+
+      'edit:delete'(eventData) {
+        if (this.editMap.get(eventData.edit_id)) {
+          this.$store.commit('REMOVE_EDIT', { id: eventData.edit_id })
+        }
+      },
+
       'episode:new'(eventData) {
         if (
           !this.episodeMap.get(eventData.episode_id) &&
-          this.currentProduction &&
-          this.currentProduction.id === eventData.project_id
+          this.currentProduction?.id === eventData.project_id
         ) {
           this.loadEpisode(eventData.episode_id)
         }
@@ -207,8 +255,7 @@ export default {
       'shot:new'(eventData) {
         if (
           !this.shotMap.get(eventData.shot_id) &&
-          this.currentProduction &&
-          this.currentProduction.id === eventData.project_id &&
+          this.currentProduction?.id === eventData.project_id &&
           (!this.isTVShow || this.currentEpisode.id === eventData.episode_id)
         ) {
           setTimeout(() => {
@@ -232,8 +279,7 @@ export default {
       'asset:new'(eventData) {
         if (
           !this.assetMap.get(eventData.asset_id) &&
-          this.currentProduction &&
-          this.currentProduction.id === eventData.project_id
+          this.currentProduction?.id === eventData.project_id
         ) {
           setTimeout(() => {
             this.loadAsset(eventData.asset_id)
@@ -333,7 +379,6 @@ export default {
       'person:delete'(eventData) {
         const person = this.personMap.get(eventData.person_id)
         if (person) {
-          this.$store.commit('DELETE_PEOPLE_START', person)
           this.$store.commit('DELETE_PEOPLE_END', person)
         }
       },
@@ -395,11 +440,15 @@ export default {
       },
 
       'metadata-descriptor:new'(eventData) {
-        this.refreshMetadataDescriptor(eventData.metadata_descriptor_id)
+        if (this.currentProduction?.id === eventData.project_id) {
+          this.refreshMetadataDescriptor(eventData.metadata_descriptor_id)
+        }
       },
 
       'metadata-descriptor:update'(eventData) {
-        this.refreshMetadataDescriptor(eventData.metadata_descriptor_id)
+        if (this.currentProduction?.id === eventData.project_id) {
+          this.refreshMetadataDescriptor(eventData.metadata_descriptor_id)
+        }
       },
 
       'metadata-descriptor:delete'(eventData) {
@@ -430,7 +479,7 @@ export default {
   font-family: Lato;
   font-style: normal;
   font-weight: 400;
-  src: url(./assets/fonts/Lato.woff2) format('woff2');
+  src: url('/fonts/Lato.woff2') format('woff2');
 }
 
 html {
@@ -761,10 +810,36 @@ h2 {
   color: $blue;
 }
 
+.tags {
+  .tag {
+    background: var(--background-tag);
+    color: var(--text);
+
+    a {
+      color: var(--text);
+    }
+
+    .action {
+      cursor: pointer;
+      background: $light-grey;
+      color: white;
+
+      .dark & {
+        background: $dark-grey;
+      }
+
+      &:hover {
+        background: $dark-grey-lighter;
+      }
+    }
+  }
+}
+
 .timecode {
   border: 1px solid $blue;
   border-radius: 5px;
   color: $blue;
+  cursor: pointer;
   font-size: 0.9em;
   padding: 3px 4px;
 
@@ -1085,7 +1160,8 @@ textarea.input:focus {
   margin-top: 30%;
   padding: 3em 2em 2em 2em;
   border-radius: 2px;
-  box-shadow: rgba(0, 0, 0, 0.14902) 0px 1px 1px 0px,
+  box-shadow:
+    rgba(0, 0, 0, 0.14902) 0px 1px 1px 0px,
     rgba(0, 0, 0, 0.09804) 0px 1px 2px 0px;
 }
 
@@ -1141,20 +1217,6 @@ textarea.input:focus {
   margin-bottom: 2em;
   margin-left: 1em;
   max-width: 95%;
-}
-
-.query-list .tag {
-  margin-right: 1em;
-  margin-bottom: 0.2em;
-  border: 1px solid transparent;
-}
-
-.query-list .tag .delete {
-  transform: rotate(45deg) scale(0.7);
-}
-
-.query-list .tag:hover {
-  transform: scale(1.1);
 }
 
 .fixed-page {
@@ -1448,6 +1510,10 @@ tbody:last-child .empty-line:last-child {
 
     &:hover .header-icon {
       opacity: 1;
+    }
+
+    .descriptor-name {
+      margin-right: 0;
     }
   }
 
@@ -1792,6 +1858,25 @@ tbody:last-child .empty-line:last-child {
   padding: 0;
 }
 
+.content {
+  ul {
+    margin: 0;
+  }
+
+  .comment-text img {
+    max-height: 1em;
+  }
+
+  .comment-text ul {
+    margin-left: 1em;
+  }
+
+  blockquote {
+    background: var(--background-tag);
+    border-left: 0.4em solid var(--background-hover);
+  }
+}
+
 .main-column {
 }
 
@@ -1891,6 +1976,10 @@ th.validation-cell {
   }
 }
 
+.input.date-input {
+  border-radius: 10px;
+}
+
 .date-input::placeholder {
   border-radius: 10px;
   color: $light-grey;
@@ -1963,7 +2052,7 @@ th.validation-cell {
   width: 150px;
 
   &.short {
-    width: 106px;
+    width: 112px;
   }
 }
 

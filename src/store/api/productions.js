@@ -9,8 +9,8 @@ export default {
     return client.getModel('projects', productionId)
   },
 
-  getOpenProductions(callback) {
-    client.get('/api/data/projects/open', callback)
+  getOpenProductions() {
+    return client.pget('/api/data/projects/open')
   },
 
   getProductionStatus(callback) {
@@ -37,7 +37,10 @@ export default {
       max_retakes: production.max_retakes,
       nb_episodes: production.nb_episodes,
       episode_span: production.episode_span,
-      is_clients_isolated: production.is_clients_isolated === 'true'
+      is_clients_isolated: production.is_clients_isolated === 'true',
+      is_preview_download_allowed:
+        production.is_preview_download_allowed === 'true',
+      homepage: production.homepage
     }
     return client.pput(`/api/data/projects/${production.id}`, data)
   },
@@ -74,6 +77,26 @@ export default {
     return client.pdel(path)
   },
 
+  addBackgroundToProduction(productionId, backgroundId) {
+    const data = { preview_background_file_id: backgroundId }
+    return client.ppost(
+      `/api/data/projects/${productionId}/settings/preview-background-files`,
+      data
+    )
+  },
+
+  removeBackgroundFromProduction(productionId, backgroundId) {
+    return client.pdel(
+      `/api/data/projects/${productionId}/settings/preview-background-files/${backgroundId}`
+    )
+  },
+
+  setDefaultBackgroundToProduction(productionId, backgroundId) {
+    return client.pput(`/api/data/projects/${productionId}`, {
+      default_preview_background_file_id: backgroundId
+    })
+  },
+
   addTaskTypeToProduction(productionId, taskTypeId, priority) {
     const data = { task_type_id: taskTypeId, priority }
     const path = `/api/data/projects/${productionId}/settings/task-types`
@@ -82,7 +105,7 @@ export default {
 
   removeTaskTypeFromProduction(productionId, taskTypeId) {
     const path = `/api/data/projects/${productionId}/settings/task-types/${taskTypeId}`
-    return client.pdel(path).catch(console.error)
+    return client.pdel(path)
   },
 
   addTaskStatusToProduction(productionId, taskStatusId) {

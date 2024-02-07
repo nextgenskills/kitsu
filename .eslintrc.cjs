@@ -12,17 +12,19 @@ module.exports = {
   rules: {
     'no-console': 'off',
     'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'off',
-    'no-unused-vars': 'off',
-    'vue/multi-word-component-names': 'off',
-    'vue/no-use-v-if-with-v-for': 'off',
+    'no-unused-vars': ['error', { args: 'none' }],
+    'no-var': 'error',
     'prefer-const': [
       'error',
       {
         destructuring: 'all'
       }
-    ]
+    ],
+    'vue/component-name-in-template-casing': ['error', 'kebab-case'],
+    'vue/multi-word-component-names': 'off',
+    'vue/no-use-v-if-with-v-for': 'off',
+    'vue/prop-name-casing': ['error', 'camelCase']
   },
   globals: {
-    Canny: true
   }
 }

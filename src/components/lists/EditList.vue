@@ -283,6 +283,7 @@
               class="metadata-descriptor datatable-row-header"
               :title="edit.data ? edit.data[descriptor.field_name] : ''"
               :style="{
+                'z-index': 1000 - i, // Need for combo to be above the next cell
                 left: offsets['editor-' + j]
                   ? `${offsets['editor-' + j]}px`
                   : '0'
@@ -955,6 +956,7 @@ input[type='number'] {
 
 td.metadata-descriptor {
   height: 3.1rem;
+  max-width: 120px;
   padding: 0;
 }
 

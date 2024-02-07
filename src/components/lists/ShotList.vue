@@ -309,6 +309,7 @@
               class="metadata-descriptor datatable-row-header"
               :title="shot.data ? shot.data[descriptor.field_name] : ''"
               :style="{
+                'z-index': 1000 - i, // Need for combo to be above the next cell
                 left: offsets['editor-' + j]
                   ? `${offsets['editor-' + j]}px`
                   : '0'
@@ -424,7 +425,7 @@
                   event =>
                     onMetadataFieldChanged(
                       shot,
-                      { field_name: 'frame_in' },
+                      { field_name: 'frame_in', data_type: 'number' },
                       event
                     )
                 "
@@ -458,7 +459,7 @@
                   event =>
                     onMetadataFieldChanged(
                       shot,
-                      { field_name: 'frame_out' },
+                      { field_name: 'frame_out', data_type: 'number' },
                       event
                     )
                 "
@@ -480,13 +481,18 @@
               <input
                 class="input-editor"
                 min="0"
-                step="1"
+                max="1000"
+                step="0.001"
                 type="number"
                 :value="getMetadataFieldValue({ field_name: 'fps' }, shot)"
                 @keydown="onNumberFieldKeyDown"
                 @input="
                   event =>
-                    onMetadataFieldChanged(shot, { field_name: 'fps' }, event)
+                    onMetadataFieldChanged(
+                      shot,
+                      { field_name: 'fps', data_type: 'number' },
+                      event
+                    )
                 "
                 @keyup.ctrl="
                   event =>
@@ -517,7 +523,7 @@
                   event =>
                     onMetadataFieldChanged(
                       shot,
-                      { field_name: 'max_retakes' },
+                      { field_name: 'max_retakes', data_type: 'number' },
                       event
                     )
                 "
@@ -1301,6 +1307,7 @@ input[type='number'] {
 
 td.metadata-descriptor {
   height: 3.1rem;
+  max-width: 120px;
   padding: 0;
 }
 </style>

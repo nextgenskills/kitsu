@@ -45,7 +45,7 @@
             class="flexrow-item"
             icon="grid"
             :is-on="isBigMode"
-            :title="$t('breakdown.big_pictures_mode')"
+            :title="$t('tasks.big_thumbnails')"
             @click="isBigMode = !isBigMode"
           />
           <button-simple
@@ -135,7 +135,10 @@
                   :style="{ padding: '0px 0px' }"
                   v-for="department in descriptorCurrentDepartments(descriptor)"
                 />
-                <span class="flexrow-item descriptor-name">
+                <span
+                  class="flexrow-item ellipsis descriptor-name"
+                  :title="descriptor.name"
+                >
                   {{ descriptor.name }}
                 </span>
               </div>
@@ -340,7 +343,7 @@ import Spinner from '@/components/widgets/Spinner'
 import DepartmentName from '@/components/widgets/DepartmentName'
 
 export default {
-  name: 'breakdown-page',
+  name: 'breakdown',
   mixins: [entityListMixin],
   components: {
     AvailableAssetBlock,
@@ -413,6 +416,7 @@ export default {
     if (!this.isLoading) {
       this.reset()
     }
+    this.resetSequenceOption()
     this.setLastProductionScreen('breakdown')
     this.isTextMode = localStorage.getItem('breakdown:text-mode') === 'true'
     window.addEventListener('keydown', this.onKeyDown, false)
@@ -457,15 +461,19 @@ export default {
     ]),
 
     castingTypeOptions() {
-      const options = [
-        {
+      const isAssetsOnly = this.currentProduction.production_type === 'assets'
+      const isShotsOnly = this.currentProduction.production_type === 'shots'
+      const options = []
+      if (!isShotsOnly) {
+        options.push({
           label: this.$t('assets.title'),
           value: 'asset'
-        }
-      ]
+        })
+      }
       if (
-        !this.isTVShow ||
-        (this.currentEpisode && this.currentEpisode.id !== 'main')
+        !isAssetsOnly &&
+        (!this.isTVShow ||
+          (this.currentEpisode && this.currentEpisode.id !== 'main'))
       ) {
         options.unshift({
           label: this.$t('shots.title'),
@@ -544,7 +552,7 @@ export default {
       this.castingEntities.forEach(entity => {
         if (this.castingByType[entity.id]) {
           this.castingByType[entity.id].forEach(type => {
-            if (!assetTypeNameMap[type[0].asset_type_name]) {
+            if (type[0] && !assetTypeNameMap[type[0].asset_type_name]) {
               assetTypeNameMap[type[0].asset_type_name] = true
               castingAssetTypes.push(type[0].asset_type_name)
             }
@@ -580,7 +588,7 @@ export default {
     },
 
     csvColumns() {
-      return this.isTVShow
+      return this.isTVShow && this.currentEpisode?.id !== 'all'
         ? ['Episode', 'Parent', 'Name', 'Asset Type', 'Asset', 'Occurences']
         : ['Parent', 'Name', 'Asset Type', 'Asset', 'Occurences']
     },
@@ -695,12 +703,22 @@ export default {
           } else {
             this.setCastingSequence(this.sequenceId || 'all')
           }
+          this.resetSequenceOption()
           this.resetSelection()
-          if (this.currentEpisode && this.currentEpisode.id === 'main') {
+          if (
+            (this.currentEpisode && this.currentEpisode.id === 'main') ||
+            this.currentProduction.production_type === 'assets'
+          ) {
             this.castingType = 'asset'
           }
         })
       })
+    },
+
+    resetSequenceOption() {
+      if (this.currentProduction.production_style === 'nft') {
+        this.sequenceId = this.castingSequencesOptions[1].value
+      }
     },
 
     resetSelection() {
@@ -918,7 +936,8 @@ export default {
     uploadImportFile(data) {
       const formData = new FormData()
       const filename = 'import.csv'
-      const file = new File([data.join('\n')], filename, { type: 'text/csv' })
+      const csvContent = csv.turnEntriesToCsvString(data)
+      const file = new File([csvContent], filename, { type: 'text/csv' })
 
       formData.append('file', file)
 
@@ -929,16 +948,17 @@ export default {
 
       this.uploadCastingFile(this.importCsvFormData)
         .then(() => {
-          this.loading.importing = false
           this.hideImportRenderModal()
           if (this.sequenceId) {
             this.setCastingSequence(this.sequenceId || 'all')
           }
         })
         .catch(err => {
-          this.loading.importing = false
           this.errors.importingError = err
           this.errors.importing = true
+        })
+        .finally(() => {
+          this.loading.importing = false
         })
     },
 
@@ -1082,10 +1102,10 @@ export default {
 
     onKeyDown(event) {
       if (!['INPUT', 'TEXTAREA'].includes(event.target.tagName)) {
-        if (event.ctrlKey && event.keyCode === 67) {
+        if ((event.ctrlKey || event.metaKey) && event.keyCode === 67) {
           // ctrl + c
           this.copyCasting()
-        } else if (event.ctrlKey && event.keyCode === 86) {
+        } else if ((event.ctrlKey || event.metaKey) && event.keyCode === 86) {
           // ctrl + v
           this.pasteCasting()
         }

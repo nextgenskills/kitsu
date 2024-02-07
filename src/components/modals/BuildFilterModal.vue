@@ -161,7 +161,7 @@
           {{ $t('entities.build_filter.assignation') }}
         </h3>
 
-        <div class="flexrow" v-if="!isCurrentUserVendor">
+        <div class="flexrow assignation-filter" v-if="!isCurrentUserVendor">
           <combobox
             class="flexrow-item"
             :options="assignation.options"
@@ -169,19 +169,39 @@
             v-model="assignation.value"
           />
 
-          <combobox-task-type
-            class="flexrow-item"
-            :task-type-list="taskTypeList"
-            v-model="assignation.taskTypeId"
-            v-if="['assigned', 'unassigned'].includes(assignation.value)"
-          />
+          <div class="flexcolumn">
+            <people-field
+              class="flexrow-item assignation-person"
+              :people="team"
+              big
+              v-model="assignation.person"
+              v-if="['assignedto', '-assignedto'].includes(assignation.value)"
+            />
+            <span
+              class="flexrow-item align-middle"
+              v-if="['assignedto', '-assignedto'].includes(assignation.value)"
+            >
+              {{ $t('main.on') }}
+            </span>
 
-          <people-field
-            class="flexrow-item"
-            :people="team"
-            v-model="assignation.person"
-            v-if="['assignedto', '-assignedto'].includes(assignation.value)"
-          />
+            <combobox-task-type
+              class="flexrow-item"
+              :task-type-list="
+                ['assigned', 'unassigned'].includes(assignation.value)
+                  ? taskTypeList
+                  : taskTypeListWithAll
+              "
+              v-model="assignation.taskTypeId"
+              v-if="
+                [
+                  'assigned',
+                  'unassigned',
+                  'assignedto',
+                  '-assignedto'
+                ].includes(assignation.value)
+              "
+            />
+          </div>
         </div>
 
         <h3 class="subtitle">
@@ -193,6 +213,36 @@
           locale-key-prefix="entities.build_filter."
           v-model="hasThumbnail.value"
         />
+
+        <h3 class="subtitle flexrow-item mt2">
+          {{ $t('task_types.fields.priority') }}
+        </h3>
+        <div class="flexrow">
+          <combobox-task-type
+            class="flexrow-item"
+            :task-type-list="taskTypeList"
+            open-top
+            v-model="priority.taskTypeId"
+          />
+          <combobox-styled
+            class="flexrow-item"
+            :options="priorityOptions"
+            locale-key-prefix="tasks."
+            v-model="priority.value"
+            v-show="priority.taskTypeId !== ''"
+          />
+        </div>
+        <h3 class="subtitle flexrow-item mt2" v-if="isAssets && !isAssetsOnly">
+          {{ $t('assets.fields.ready_for') }}
+        </h3>
+        <div class="flexrow" v-if="isAssets && !isAssetsOnly">
+          <combobox-task-type
+            class="flexrow-item"
+            :task-type-list="readyForTaskTypeList"
+            open-top
+            v-model="readyFor.taskTypeId"
+          />
+        </div>
 
         <h3 class="subtitle flexrow-item mt2" v-if="isShots">
           {{ $t('entities.build_filter.is_assets_ready') }}
@@ -224,14 +274,16 @@
 </template>
 
 <script>
-import { mapGetters, mapActions } from 'vuex'
+import { mapGetters } from 'vuex'
 import { modalMixin } from '@/components/modals/base_modal'
 import { getFilters } from '@/lib/filtering'
+import { sortPeople } from '@/lib/sorting'
 import { descriptorMixin } from '@/components/mixins/descriptors'
 
 import ButtonSimple from '@/components/widgets/ButtonSimple'
 import Combobox from '@/components/widgets/Combobox'
 import ComboboxStatus from '@/components/widgets/ComboboxStatus'
+import ComboboxStyled from '@/components/widgets/ComboboxStyled'
 import ComboboxTaskType from '@/components/widgets/ComboboxTaskType'
 import ModalFooter from '@/components/modals/ModalFooter'
 import PeopleField from '@/components/widgets/PeopleField'
@@ -245,6 +297,7 @@ export default {
     ButtonSimple,
     Combobox,
     ComboboxStatus,
+    ComboboxStyled,
     ComboboxTaskType,
     ModalFooter,
     PeopleField,
@@ -308,6 +361,19 @@ export default {
           { label: 'without_thumbnail', value: '-withthumbnail' }
         ]
       },
+      priorityOptions: [
+        { label: 'priority.normal', value: '0' },
+        { label: 'priority.high', value: '1' },
+        { label: 'priority.very_high', value: '2' },
+        { label: 'priority.emergency', value: '3' }
+      ],
+      priority: {
+        taskTypeId: '',
+        value: '-1'
+      },
+      readyFor: {
+        taskTypeId: ''
+      },
       isAssetsReady: {
         value: 'nofilter',
         taskTypeId: '',
@@ -351,6 +417,7 @@ export default {
       'productionAssetTypes',
       'productionTaskStatuses',
       'productionTaskTypes',
+      'productionShotTaskTypes',
       'sequenceSearchText',
       'sequenceMetadataDescriptors',
       'sequenceValidationColumns',
@@ -368,6 +435,10 @@ export default {
       return this.entityType === 'shot'
     },
 
+    isAssetsOnly() {
+      return this.currentProduction.production_type === 'assets'
+    },
+
     assetTypeOptions() {
       return [
         { label: this.$t('entities.build_filter.all_types'), value: '-' },
@@ -382,14 +453,38 @@ export default {
       ]
     },
 
+    taskTypeListWithAll() {
+      return [
+        {
+          id: '',
+          color: '#999',
+          name: this.$t('main.all')
+        }
+      ].concat(this.taskTypeList)
+    },
+
     taskTypeList() {
       return this[`${this.entityType}ValidationColumns`].map(taskTypeId =>
         this.taskTypeMap.get(taskTypeId)
       )
     },
 
+    readyForTaskTypeList() {
+      return [
+        {
+          id: '',
+          color: '#999',
+          name: this.$t('news.all')
+        }
+      ].concat(this.productionShotTaskTypes)
+    },
+
     team() {
-      return this.currentProduction.team.map(pId => this.personMap.get(pId))
+      return sortPeople(
+        this.currentProduction.team.map(personId =>
+          this.personMap.get(personId)
+        )
+      )
     },
 
     descriptorOptions() {
@@ -405,8 +500,6 @@ export default {
   },
 
   methods: {
-    ...mapActions([]),
-
     // Build filter
 
     applyFilter() {
@@ -422,6 +515,8 @@ export default {
       query = this.applyAssignationChoice(query)
       query = this.applyThumbnailChoice(query)
       query = this.applyUnionChoice(query)
+      query = this.applyPriorityChoice(query)
+      query = this.applyReadyForChoice(query)
       query = this.applyAssetsReadyChoice(query)
       return query.trim()
     },
@@ -473,8 +568,13 @@ export default {
       if (this.assignation.value !== 'nofilter') {
         if (this.assignation.person) {
           let value = this.assignation.person.name
+          const taskType = this.taskTypeMap.get(this.assignation.taskTypeId)
           if (this.assignation.value === '-assignedto') value = `-${value}`
-          query += ` assignedto=[${value}]`
+          if (taskType) {
+            query += ` assignedto[${taskType.name}]=[${value}]`
+          } else {
+            query += ` assignedto[]=[${value}]`
+          }
         } else if (this.assignation.taskTypeId) {
           const taskType = this.taskTypeMap.get(this.assignation.taskTypeId)
           const value =
@@ -495,6 +595,23 @@ export default {
     applyUnionChoice(query) {
       if (this.union === 'or') {
         query = ` +(${query.trim()})`
+      }
+      return query
+    },
+
+    applyPriorityChoice(query) {
+      if (this.priority.taskTypeId !== '' && this.priority.value !== '-1') {
+        const taskType = this.taskTypeMap.get(this.priority.taskTypeId)
+        const value = this.priority.value
+        query = ` priority-[${taskType.name.toLowerCase()}]=${value}`
+      }
+      return query
+    },
+
+    applyReadyForChoice(query) {
+      if (this.readyFor.taskTypeId !== '') {
+        const taskType = this.taskTypeMap.get(this.readyFor.taskTypeId)
+        query = ` readyfor=[${taskType.name.toLowerCase()}]`
       }
       return query
     },
@@ -637,6 +754,10 @@ export default {
             this.setFiltersFromAssignedToQuery(filter)
           } else if (filter.type === 'thumbnail') {
             this.setFiltersFromThumbnailQuery(filter)
+          } else if (filter.type === 'priority') {
+            this.setFiltersFromPriorityQuery(filter)
+          } else if (filter.type === 'readyfor') {
+            this.setFiltersFromReadyForQuery(filter)
           } else if (filter.type === 'assetsready') {
             this.setFiltersFromAssetsReadyQuery(filter)
           }
@@ -711,6 +832,7 @@ export default {
     setFiltersFromAssignedToQuery(filter) {
       this.assignation.value = filter.excluding ? '-assignedto' : 'assignedto'
       this.assignation.person = this.people.find(p => p.id === filter.personId)
+      this.assignation.taskTypeId = filter.taskType?.id
     },
 
     setFiltersFromThumbnailQuery(filter) {
@@ -719,6 +841,15 @@ export default {
       } else {
         this.hasThumbnail.value = 'withthumbnail'
       }
+    },
+
+    setFiltersFromPriorityQuery(filter) {
+      this.priority.taskTypeId = filter.taskTypeId
+      this.priority.value = filter.value + ''
+    },
+
+    setFiltersFromReadyForQuery(filter) {
+      this.readyFor.taskTypeId = filter.value
     },
 
     setFiltersFromAssetsReadyQuery(filter) {
@@ -758,6 +889,9 @@ export default {
         this.reset()
         this.assignation.taskTypeId =
           this.taskTypeList.length > 0 ? this.taskTypeList[0].id : ''
+        this.readyFor.taskTypeId = ''
+        this.priority.taskTypeId = ''
+        this.priority.value = '0'
         this.setFiltersFromCurrentQuery()
       }
     }
@@ -806,5 +940,21 @@ export default {
 .value-column {
   flex-direction: column;
   align-items: flex-start;
+}
+
+.assignation-filter {
+  align-items: flex-start;
+
+  input {
+    line-height: 30px;
+  }
+}
+
+.assignation-person {
+  margin-bottom: 0.5em;
+}
+
+.align-middle {
+  margin-top: 9px;
 }
 </style>

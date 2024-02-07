@@ -44,8 +44,11 @@
             v-if="productionToEdit && productionToEdit.id"
             ref="fpsField"
             :label="$t('productions.fields.fps')"
-            v-model="form.fps"
+            type="number"
+            :max="60"
+            :step="0.001"
             @enter="runConfirmation"
+            v-model="form.fps"
             v-focus
           />
           <text-field
@@ -145,7 +148,7 @@ export default {
         ratio: this.productionToEdit.ratio,
         resolution: this.productionToEdit.resolution,
         production_type: this.productionToEdit.production_type || 'short',
-        production_style: this.productionToEdit.production_style || '3d'
+        production_style: this.productionToEdit.production_style || '2d3d'
       }
     } else {
       data.form = {
@@ -157,7 +160,7 @@ export default {
         ratio: '',
         resolution: '',
         production_type: 'short',
-        production_style: '3d'
+        production_style: '2d3d'
       }
     }
 

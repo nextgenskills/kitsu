@@ -60,13 +60,13 @@
             </ul>
           </div>
 
-          <div class="flexcolumn-item flexrow">
+          <div class="flexcolumn-item flexrow search-options mb1">
             <div class="flexrow-item">
               <search-field
                 ref="task-search-field"
                 :can-save="true"
+                :focus-options="{ preventScroll: true }"
                 @change="onSearchChange"
-                @enter="saveSearchQuery"
                 @save="saveSearchQuery"
                 placeholder="ex: retake chara"
               />
@@ -85,6 +85,14 @@
                 :options="estimationOptions"
                 locale-key-prefix="tasks."
                 v-model="estimationFilter"
+              />
+            </div>
+            <div class="flexrow-item" v-if="isActiveTab('tasks')">
+              <combobox-styled
+                :label="$t('task_types.fields.priority')"
+                :options="priorityOptions"
+                locale-key-prefix="tasks."
+                v-model="priorityFilter"
               />
             </div>
             <div class="filler"></div>
@@ -139,6 +147,7 @@
             </div>
             <div class="flexrow-item zoom-level" v-if="isActiveTab('schedule')">
               <combobox-number
+                class="mt0"
                 :label="$t('schedule.zoom_level')"
                 :options="schedule.zoomOptions"
                 no-field
@@ -151,6 +160,7 @@
         <div class="query-list">
           <search-query-list
             :queries="searchQueries"
+            type="taskType"
             @change-search="changeSearch"
             @remove-search="removeSearchQuery"
             v-if="!loading.entities"
@@ -275,14 +285,14 @@ import DateField from '@/components/widgets/DateField'
 import ComboboxStyled from '@/components/widgets/ComboboxStyled'
 import ComboboxNumber from '@/components/widgets/ComboboxNumber'
 import EstimationHelper from '@/components/pages/tasktype/EstimationHelper'
+import ImportModal from '@/components/modals/ImportModal'
+import ImportRenderModal from '@/components/modals/ImportRenderModal'
 import Schedule from '@/components/pages/schedule/Schedule'
 import SearchField from '@/components/widgets/SearchField'
 import SearchQueryList from '@/components/widgets/SearchQueryList'
 import TaskInfo from '@/components/sides/TaskInfo'
 import TaskList from '@/components/lists/TaskList'
 import TaskTypeName from '@/components/widgets/TaskTypeName'
-import ImportModal from '@/components/modals/ImportModal'
-import ImportRenderModal from '@/components/modals/ImportRenderModal'
 
 const filters = {
   all(tasks) {
@@ -298,7 +308,7 @@ const filters = {
   },
 
   duepreviousweek(tasks) {
-    const previousWeek = moment().add('days', -7).isoWeek()
+    const previousWeek = moment().add(-7, 'days').isoWeek()
     return tasks.filter(t => {
       const dueDate = parseDate(t.due_date)
       return dueDate.isoWeek() === previousWeek
@@ -306,7 +316,7 @@ const filters = {
   },
 
   duenextweek(tasks) {
-    const nextWeek = moment().add('days', 7).isoWeek()
+    const nextWeek = moment().add(7, 'days').isoWeek()
     return tasks.filter(t => {
       const dueDate = parseDate(t.due_date)
       return dueDate.isoWeek() === nextWeek
@@ -330,7 +340,7 @@ const filters = {
   },
 
   duepreviousmonth(tasks) {
-    const previousMonth = moment().add('months', -1).month()
+    const previousMonth = moment().add(-1, 'months').month()
     return tasks.filter(t => {
       const dueDate = parseDate(t.due_date)
       return dueDate.month() === previousMonth
@@ -338,7 +348,7 @@ const filters = {
   },
 
   duenextmonth(tasks) {
-    const nextMonth = moment().add('months', 1).month()
+    const nextMonth = moment().add(1, 'months').month()
     return tasks.filter(t => {
       const dueDate = parseDate(t.due_date)
       return dueDate.month() === nextMonth
@@ -385,7 +395,7 @@ const filters = {
 }
 
 export default {
-  name: 'task-type-page',
+  name: 'task-type',
   mixins: [formatListMixin, searchMixin],
   components: {
     ButtonSimple,
@@ -416,6 +426,7 @@ export default {
       dueDateFilter: 'all',
       entityType: 'Asset',
       estimationFilter: 'all',
+      priorityFilter: '-1',
       tasks: [],
       selection: {},
       dueDateOptions: [
@@ -442,8 +453,16 @@ export default {
       },
       loading: {
         entities: false,
-        importing: false
+        importing: false,
+        savingSearch: false
       },
+      priorityOptions: [
+        { label: 'all_tasks', value: '-1' },
+        { label: 'priority.normal', value: '0' },
+        { label: 'priority.high', value: '1' },
+        { label: 'priority.very_high', value: '2' },
+        { label: 'priority.emergency', value: '3' }
+      ],
       schedule: {
         currentColor: 'status',
         startDate: null,
@@ -454,6 +473,7 @@ export default {
         taskTypeStartDate: null,
         zoomLevel: 1,
         zoomOptions: [
+          { label: 'Week', value: 0 },
           { label: '1', value: 1 },
           { label: '2', value: 2 },
           { label: '3', value: 3 }
@@ -486,6 +506,7 @@ export default {
   },
 
   mounted() {
+    this.searchField.setValue(this.$route.query.search || '')
     this.clearSelectedTasks()
     const isAssets = this.$route.path.includes('assets')
     const isShots = this.$route.path.includes('shots')
@@ -494,12 +515,12 @@ export default {
     this.entityType = isAssets
       ? 'Asset'
       : isShots
-      ? 'Shot'
-      : isEdits
-      ? 'Edit'
-      : isSequences
-      ? 'Sequence'
-      : 'Episode'
+        ? 'Shot'
+        : isEdits
+          ? 'Edit'
+          : isSequences
+            ? 'Sequence'
+            : 'Episode'
     this.updateActiveTab()
     setTimeout(() => {
       this.initData(false)
@@ -567,9 +588,8 @@ export default {
     locale() {
       if (this.user.locale === 'fr_FR') {
         return fr
-      } else {
-        return en
       }
+      return en
     },
 
     productionStartDate() {
@@ -622,12 +642,10 @@ export default {
             `${episodeName} / ` +
             `${this.currentTaskType.name}`
           )
-        } else {
-          return `${this.currentProduction.name} / ${this.currentTaskType.name}`
         }
-      } else {
-        return 'Loading...'
+        return `${this.currentProduction.name} / ${this.currentTaskType.name}`
       }
+      return 'Loading...'
     },
 
     // Paths
@@ -702,10 +720,11 @@ export default {
     },
 
     scheduleTeam() {
-      const scheduleTeam = this.currentProduction.team.map(personId => {
-        return this.personMap.get(personId)
-      })
-      return sortPeople(scheduleTeam)
+      return sortPeople(
+        this.currentProduction.team.map(personId =>
+          this.personMap.get(personId)
+        )
+      )
     },
 
     scheduleWidget() {
@@ -735,7 +754,7 @@ export default {
 
     initData(force) {
       this.resetTasks()
-      this.focusSearchField()
+      this.focusSearchField({ preventScroll: true })
       if (this.tasks.length < 2) {
         this.loading.entities = true
         this.errors.entities = false
@@ -744,10 +763,11 @@ export default {
           .then(() => {
             this.loading.entities = false
             this.resetTasks()
-            this.focusSearchField()
-            const searchQuery = this.searchField
-              ? this.searchField.getValue()
-              : ''
+            this.focusSearchField({ preventScroll: true })
+            let searchQuery = this.$route.query.search
+            if (!searchQuery && this.searchField) {
+              searchQuery = this.searchField.getValue()
+            }
             if (searchQuery) this.onSearchChange(searchQuery)
             setTimeout(() => {
               this.setSearchFromUrl()
@@ -757,6 +777,10 @@ export default {
               this.resetScheduleItems()
               this.resetScheduleScroll()
             }
+
+            this.dueDateFilter = this.$route.query.duedate || 'all'
+            this.estimationFilter = this.$route.query.late || 'all'
+            this.priorityFilter = this.$route.query.priority || '-1'
           })
           .catch(err => {
             console.error(err)
@@ -768,6 +792,11 @@ export default {
         this.setCurrentScheduleItem().then(() => {
           this.resetTaskTypeDates()
           this.loading.entities = false
+          let searchQuery = this.$route.query.search
+          if (!searchQuery && this.searchField) {
+            searchQuery = this.searchField.getValue()
+          }
+          if (searchQuery) this.onSearchChange(searchQuery)
           if (this.isActiveTab('schedule')) {
             this.resetScheduleItems()
             this.resetScheduleScroll()
@@ -795,18 +824,17 @@ export default {
             Promise.resolve(this.currentScheduleItem)
           }
         })
-      } else {
-        return this.loadScheduleItems(this.currentProduction).then(items => {
-          if (!items) {
-            Promise.resolve([])
-          } else {
-            this.currentScheduleItem = items.find(item => {
-              return item.task_type_id === this.currentTaskType.id
-            })
-            Promise.resolve(this.currentScheduleItem)
-          }
-        })
       }
+      return this.loadScheduleItems(this.currentProduction).then(items => {
+        if (!items) {
+          Promise.resolve([])
+        } else {
+          this.currentScheduleItem = items.find(item => {
+            return item.task_type_id === this.currentTaskType.id
+          })
+          Promise.resolve(this.currentScheduleItem)
+        }
+      })
     },
 
     // Tabs
@@ -895,26 +923,51 @@ export default {
           this.taskStatusMap
         )
       }
+      if (this.priorityFilter !== '-1') {
+        this.tasks = this.tasks.filter(
+          t => t.priority === parseInt(this.priorityFilter)
+        )
+      }
     },
 
     saveSearchQuery(searchQuery) {
+      if (this.loading.savingSearch) {
+        return
+      }
       const entityType = this.entityType
+      this.loading.savingSearch = true
       this.saveTaskSearch({ searchQuery, entityType })
-        .then(() => {})
-        .catch(err => {
-          console.error(err)
+        .catch(console.error)
+        .finally(() => {
+          this.loading.savingSearch = false
         })
     },
 
     removeSearchQuery(searchQuery) {
-      this.removeTaskSearch(searchQuery)
-        .then(() => {})
-        .catch(err => {
-          console.error(err)
-        })
+      this.removeTaskSearch(searchQuery).catch(err => {
+        console.error(err)
+      })
+    },
+
+    updateUrlParams() {
+      const search = this.searchField.getValue()
+      const duedate = this.dueDateFilter
+      const late = this.estimationFilter
+      const priority = this.priorityFilter
+      this.$router.push({
+        query: { search, duedate, late, priority }
+      })
     },
 
     // Tasks
+
+    applyTaskFilters() {
+      this.onSearchChange(this.searchField.getValue())
+      this.sortTasks()
+      this.$refs['task-list'].resetSelection()
+      this.updateUrlParams()
+      this.clearSelectedTasks()
+    },
 
     onTaskSelected(task) {
       this.currentTask = task
@@ -935,7 +988,7 @@ export default {
 
     resetTaskIndex() {
       this.$options.taskIndex = buildSupervisorTaskIndex(
-        this.tasks,
+        this.entityTasks,
         this.personMap,
         this.taskStatusMap
       )
@@ -1084,7 +1137,6 @@ export default {
           avatar: true,
           has_avatar: person.has_avatar,
           avatarPath: person.avatarPath,
-          uniqueHash: person.uniqueHash,
           initials: person.initials,
           id: person.id,
           name: person.full_name,
@@ -1157,20 +1209,20 @@ export default {
         return {
           ...task,
           name: task.entity_name,
-          startDate: startDate,
-          endDate: endDate,
+          startDate,
+          endDate,
           expanded: false,
           loading: false,
           man_days: estimation,
           editable: this.isSupervisorInDepartment,
-          unresizable: estimation > 0,
+          unresizable: true,
           parentElement: personElement,
           color: this.getTaskElementColor(task, endDate),
           children: []
         }
       })
       Object.assign(personElement, {
-        children: children,
+        children,
         startDate: minStartDate,
         endDate: maxEndDate,
         man_days: manDays
@@ -1188,9 +1240,8 @@ export default {
           !this.taskStatusMap.get(task.task_status_id).is_done &&
           endDate.isBefore(moment())
         return isLate ? '#FF3860' : '#999'
-      } else {
-        return null
       }
+      return null
     },
 
     saveTaskScheduleItem(item) {
@@ -1225,7 +1276,7 @@ export default {
     },
 
     getMaxDate(personElement) {
-      const startDate = this.productionEndDate
+      const startDate = this.productionStartDate
       let maxDate = startDate.clone()
       personElement.children.forEach(item => {
         if (item.endDate && item.endDate.isAfter(maxDate)) {
@@ -1280,7 +1331,8 @@ export default {
     uploadImportFile(data) {
       const formData = new FormData()
       const filename = 'import.csv'
-      const file = new File([data.join('\n')], filename, { type: 'text/csv' })
+      const csvContent = csv.turnEntriesToCsvString(data)
+      const file = new File([csvContent], filename, { type: 'text/csv' })
 
       formData.append('file', file)
 
@@ -1291,13 +1343,14 @@ export default {
 
       this.uploadTaskTypeEstimations(this.importCsvFormData) // to change
         .then(() => {
-          this.loading.importing = false
           this.hideImportRenderModal()
         })
         .catch(err => {
-          this.loading.importing = false
           this.errors.importingError = err
           this.errors.importing = true
+        })
+        .finally(() => {
+          this.loading.importing = false
         })
     },
 
@@ -1334,7 +1387,7 @@ export default {
           today.isAfter(moment(this.schedule.taskTypeEndDate))
         ) {
           this.$refs['schedule-widget'].scrollToDate(
-            moment(this.schedule.taskTypeStartDate).add('days', 20)
+            moment(this.schedule.taskTypeStartDate).add(20, 'days')
           )
         } else {
           this.$refs['schedule-widget'].scrollToToday()
@@ -1364,17 +1417,15 @@ export default {
     },
 
     dueDateFilter() {
-      this.onSearchChange(this.searchField.getValue())
-      this.sortTasks()
-      this.$refs['task-list'].resetSelection()
-      this.clearSelectedTasks()
+      this.applyTaskFilters()
     },
 
     estimationFilter() {
-      this.onSearchChange(this.searchField.getValue())
-      this.sortTasks()
-      this.$refs['task-list'].resetSelection()
-      this.clearSelectedTasks()
+      this.applyTaskFilters()
+    },
+
+    priorityFilter() {
+      this.applyTaskFilters()
     },
 
     currentSort() {
@@ -1460,6 +1511,10 @@ export default {
   margin-right: 0;
 }
 
+.search-options {
+  align-items: flex-end;
+}
+
 .tabs ul {
   margin-left: 0;
 }
@@ -1519,7 +1574,7 @@ export default {
 }
 
 .zoom-level {
-  margin-top: -8px;
+  margin-bottom: 6px;
 }
 
 .task-type-estimation {

@@ -57,6 +57,7 @@ import {
   UNLOCK_SEQUENCE,
   UPDATE_SEQUENCE,
   UPDATE_METADATA_DESCRIPTOR_END,
+  RESET_SEQUENCES,
   RESET_ALL
 } from '@/store/mutation-types'
 
@@ -301,32 +302,27 @@ const actions = {
   },
 
   saveSequenceSearch({ commit, rootGetters }, searchQuery) {
-    const query = state.sequenceSearchQueries.find(
-      query => query && query.name === searchQuery
-    )
-    const production = rootGetters.currentProduction
-    if (!query) {
-      return peopleApi
-        .createFilter(
-          'sequence',
-          searchQuery,
-          searchQuery,
-          production.id,
-          'Sequence'
-        )
-        .then(query => {
-          commit(ADD_SEQUENCE_SEARCH, query)
-          return Promise.resolve(query)
-        })
-    } else {
-      return Promise.resolve()
+    if (state.sequenceSearchQueries.some(query => query.name === searchQuery)) {
+      return
     }
+    const production = rootGetters.currentProduction
+    return peopleApi
+      .createFilter(
+        'sequence',
+        searchQuery,
+        searchQuery,
+        production.id,
+        'Sequence'
+      )
+      .then(searchQuery => {
+        commit(ADD_SEQUENCE_SEARCH, searchQuery)
+        return searchQuery
+      })
   },
 
-  removeSequenceSearch({ commit, rootGetters }, searchQuery) {
+  removeSequenceSearch({ commit }, searchQuery) {
     return peopleApi.removeFilter(searchQuery).then(() => {
       commit(REMOVE_SEQUENCE_SEARCH, searchQuery)
-      return Promise.resolve()
     })
   },
 
@@ -427,7 +423,7 @@ const actions = {
           (!isTVShow || seq.episode_id === sequence.episode_id)
       )
     ) {
-      return Promise.reject(new Error('Sequence already exsists'))
+      return Promise.reject(new Error('Sequence already exists'))
     }
     return shotsApi.newSequence(sequence).then(sequence => {
       commit(NEW_SEQUENCE_END, { sequence, episodeMap })
@@ -449,10 +445,11 @@ const actions = {
 
   editSequence({ commit, state }, data) {
     commit(LOCK_SEQUENCE, data)
-    return shotsApi.updateSequence(data).then(sequence => {
-      commit(EDIT_SEQUENCE_END, sequence)
-      commit(UNLOCK_SEQUENCE, data)
-      return Promise.resolve(sequence)
+    commit(EDIT_SEQUENCE_END, data)
+    return shotsApi.updateSequence(data).finally(() => {
+      setTimeout(() => {
+        commit(UNLOCK_SEQUENCE, data)
+      }, 2000)
     })
   },
 
@@ -464,10 +461,10 @@ const actions = {
   },
 
   loadSequence({ commit, state, rootGetters }, sequenceId) {
-    const episodeMap = rootGetters.episodeMap
-    const sequence = rootGetters.sequenceMap.get(sequenceId)
-    if (sequence && sequence.lock) return
+    const sequence = state.sequenceMap.get(sequenceId)
+    if (sequence?.lock) return
 
+    const episodeMap = rootGetters.episodeMap
     return shotsApi
       .getSequence(sequenceId)
       .then(sequence => {
@@ -522,6 +519,10 @@ const actions = {
     const taskStatusMap = rootGetters.taskStatusMap
     const taskMap = rootGetters.taskMap
     commit(COMPUTE_SEQUENCE_STATS, { taskStatusMap, taskMap })
+  },
+
+  resetSequences({ commit }) {
+    commit(RESET_SEQUENCES)
   }
 }
 
@@ -775,7 +776,9 @@ const mutations = {
   [EDIT_SEQUENCE_END](state, newSequence) {
     const sequence = state.sequenceMap.get(newSequence.id)
     if (sequence) {
-      Object.assign(sequence, newSequence)
+      const copyNewSequence = { ...newSequence }
+      copyNewSequence.data = { ...sequence.data, ...newSequence.data }
+      Object.assign(sequence, copyNewSequence)
     }
     state.sequenceIndex = buildSequenceIndex(cache.sequences)
     if (sequence.description && !state.isSequenceDescription) {
@@ -1014,12 +1017,16 @@ const mutations = {
 
   [LOCK_SEQUENCE](state, sequence) {
     sequence = state.sequenceMap.get(sequence.id)
-    if (sequence) sequence.lock = true
+    if (sequence) {
+      sequence.lock = !sequence.lock ? 1 : sequence.lock + 1
+    }
   },
 
   [UNLOCK_SEQUENCE](state, sequence) {
     sequence = state.sequenceMap.get(sequence.id)
-    if (sequence) sequence.lock = false
+    if (sequence) {
+      sequence.lock = !sequence.lock ? 0 : sequence.lock - 1
+    }
   },
 
   [UPDATE_METADATA_DESCRIPTOR_END](
@@ -1037,6 +1044,23 @@ const mutations = {
         delete data[previousDescriptorFieldName]
         sequence.data = data
       })
+    }
+  },
+
+  [RESET_SEQUENCES](state) {
+    const sequences = cache.result
+    state.displayedSequences = sequences
+    state.sequenceFilledColumns = getFilledColumns(state.displayedSequences)
+    const previousX = Object.keys(state.sequenceSelectionGrid).length
+    const maxX = state.displayedSequences.length
+    const maxY = state.nbValidationColumns
+    if (previousX >= 0) {
+      state.sequenceSelectionGrid = appendSelectionGrid(
+        state.sequenceSelectionGrid,
+        previousX,
+        maxX,
+        maxY
+      )
     }
   }
 }

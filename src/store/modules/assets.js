@@ -64,6 +64,8 @@ import {
   SAVE_ASSET_SEARCH_END,
   REMOVE_ASSET_SEARCH_END,
   SET_ASSET_TYPE_SEARCH,
+  SAVE_ASSET_SEARCH_FILTER_GROUP_END,
+  REMOVE_ASSET_SEARCH_FILTER_GROUP_END,
   COMPUTE_ASSET_TYPE_STATS,
   UPDATE_METADATA_DESCRIPTOR_END,
   SET_CURRENT_EPISODE,
@@ -253,7 +255,8 @@ const helpers = {
 const cache = {
   assetIndex: {},
   assetTypeIndex: {},
-  assets: []
+  assets: [],
+  result: []
 }
 
 const initialState = {
@@ -271,6 +274,7 @@ const initialState = {
   assetSearchText: '',
   assetSelectionGrid: {},
   assetSearchQueries: [],
+  assetSearchFilterGroups: [],
   assetSorting: [],
 
   displayedAssetTypes: [],
@@ -302,6 +306,7 @@ const getters = {
   assetMap: state => state.assetMap,
   assetSearchText: state => state.assetSearchText,
   assetSearchQueries: state => state.assetSearchQueries,
+  assetSearchFilterGroups: state => state.assetSearchFilterGroups,
   assetSelectionGrid: state => state.assetSelectionGrid,
   assetValidationColumns: state => state.assetValidationColumns,
 
@@ -350,6 +355,7 @@ const actions = {
     let episode = rootGetters.currentEpisode
     const isTVShow = rootGetters.isTVShow
     const userFilters = rootGetters.userFilters
+    const userFilterGroups = rootGetters.userFilterGroups
     const personMap = rootGetters.personMap
     const taskTypeMap = rootGetters.taskTypeMap
     const taskMap = rootGetters.taskMap
@@ -382,6 +388,7 @@ const actions = {
           production,
           assets,
           userFilters,
+          userFilterGroups,
           personMap,
           taskMap,
           taskTypeMap
@@ -389,7 +396,7 @@ const actions = {
         return Promise.resolve(assets)
       })
       .catch(err => {
-        console.error('an error occured while loading assets', err)
+        console.error('an error occurred while loading assets', err)
         commit(LOAD_ASSETS_ERROR)
         return Promise.resolve([])
       })
@@ -405,7 +412,7 @@ const actions = {
    */
   loadAsset({ commit, state, rootGetters }, assetId) {
     const asset = state.assetMap.get(assetId)
-    if (asset && asset.lock) return
+    if (asset?.lock) return
 
     const personMap = rootGetters.personMap
     const production = rootGetters.currentProduction
@@ -435,7 +442,7 @@ const actions = {
 
   newAsset({ commit, dispatch, state, rootGetters }, data) {
     if (cache.assets.find(asset => asset.name === data.name)) {
-      return Promise.reject(new Error('Asset already exsists'))
+      return Promise.reject(new Error('Asset already exists'))
     }
     return assetsApi.newAsset(data).then(asset => {
       const assetTypeMap = rootGetters.assetTypeMap
@@ -457,16 +464,17 @@ const actions = {
         })
       }
       const createTaskPromises = taskTypeIds.map(taskTypeId => {
-        return dispatch('createTasks', {
-          entityIds: [asset.id],
-          project_id: asset.project_id,
-          task_type_id: taskTypeId,
+        dispatch('createTask', {
+          entityId: asset.id,
+          projectId: asset.project_id,
+          taskTypeId: taskTypeId,
           type: 'assets'
         })
       })
       return func
         .runPromiseAsSeries(createTaskPromises)
         .then(() => Promise.resolve(asset))
+        .catch(console.error)
     })
   },
 
@@ -477,16 +485,15 @@ const actions = {
         return asset.name === data.name && data.id !== asset.id
       })
     if (existingAsset) {
-      return Promise.reject(new Error('Asset already exsists'))
+      return Promise.reject(new Error('Asset already exists'))
     }
     const assetTypeMap = rootState.assetTypes.assetTypeMap
     commit(LOCK_ASSET, data)
     commit(EDIT_ASSET_END, { newAsset: data, assetTypeMap })
-    return assetsApi.updateAsset(data).then(asset => {
+    return assetsApi.updateAsset(data).finally(() => {
       setTimeout(() => {
         commit(UNLOCK_ASSET, data)
       }, 2000)
-      return Promise.resolve(asset)
     })
   },
 
@@ -541,28 +548,52 @@ const actions = {
   },
 
   saveAssetSearch({ commit, state, rootGetters }, searchQuery) {
-    const query = state.assetSearchQueries.find(
-      query => query.name === searchQuery
-    )
-    const production = rootGetters.currentProduction
-
-    if (!query) {
-      return peopleApi
-        .createFilter('asset', searchQuery, searchQuery, production.id, null)
-        .then(searchQuery => {
-          commit(SAVE_ASSET_SEARCH_END, { searchQuery, production })
-          return Promise.resolve(searchQuery)
-        })
-    } else {
-      Promise.resolve()
+    if (state.assetSearchQueries.some(query => query.name === searchQuery)) {
+      return
     }
+    const production = rootGetters.currentProduction
+    return peopleApi
+      .createFilter('asset', searchQuery, searchQuery, production.id, null)
+      .then(searchQuery => {
+        commit(SAVE_ASSET_SEARCH_END, { searchQuery, production })
+        return searchQuery
+      })
+  },
+
+  saveAssetSearchFilterGroup({ commit, state, rootGetters }, filterGroup) {
+    const groupExist = state.assetSearchFilterGroups.some(
+      query => query.name === filterGroup.name
+    )
+    if (groupExist) {
+      return
+    }
+
+    const production = rootGetters.currentProduction
+    return peopleApi
+      .createFilterGroup(
+        'asset',
+        filterGroup.name,
+        filterGroup.color,
+        production.id,
+        null
+      )
+      .then(filterGroup => {
+        commit(SAVE_ASSET_SEARCH_FILTER_GROUP_END, { filterGroup, production })
+        return filterGroup
+      })
   },
 
   removeAssetSearch({ commit, rootGetters }, searchQuery) {
     const production = rootGetters.currentProduction
     return peopleApi.removeFilter(searchQuery).then(() => {
       commit(REMOVE_ASSET_SEARCH_END, { searchQuery, production })
-      return Promise.resolve()
+    })
+  },
+
+  removeAssetSearchFilterGroup({ commit, rootGetters }, filterGroup) {
+    const production = rootGetters.currentProduction
+    return peopleApi.removeFilterGroup(filterGroup).then(() => {
+      commit(REMOVE_ASSET_SEARCH_FILTER_GROUP_END, { filterGroup, production })
     })
   },
 
@@ -726,6 +757,7 @@ const mutations = {
     state.assetFilledColumns = {}
     helpers.setListStats(state, [])
     state.assetSearchQueries = []
+    state.assetSearchFilterGroups = []
 
     state.selectedAssets = new Map()
   },
@@ -743,6 +775,7 @@ const mutations = {
     state.assetFilledColumns = {}
     helpers.setListStats(state, [])
     state.assetSearchQueries = []
+    state.assetSearchFilterGroups = []
 
     state.selectedAssets = new Map()
   },
@@ -754,7 +787,15 @@ const mutations = {
 
   [LOAD_ASSETS_END](
     state,
-    { production, assets, userFilters, personMap, taskMap, taskTypeMap }
+    {
+      production,
+      assets,
+      userFilters,
+      userFilterGroups,
+      personMap,
+      taskMap,
+      taskTypeMap
+    }
   ) {
     const validationColumns = {}
     const assetTypeMap = new Map()
@@ -814,11 +855,10 @@ const mutations = {
     const maxY = state.nbValidationColumns
     state.assetSelectionGrid = buildSelectionGrid(maxX, maxY)
 
-    if (userFilters.asset && userFilters.asset[production.id]) {
-      state.assetSearchQueries = userFilters.asset[production.id]
-    } else {
-      state.assetSearchQueries = []
-    }
+    state.assetSearchQueries = userFilters.asset?.[production.id] || []
+
+    state.assetSearchFilterGroups =
+      userFilterGroups?.asset?.[production.id] || []
   },
 
   [ADD_ASSET](state, { taskTypeMap, taskMap, personMap, production, asset }) {
@@ -965,6 +1005,13 @@ const mutations = {
     }
   },
 
+  [SAVE_ASSET_SEARCH_FILTER_GROUP_END](state, { filterGroup }) {
+    if (!state.assetSearchFilterGroups.includes(filterGroup)) {
+      state.assetSearchFilterGroups.push(filterGroup)
+      state.assetSearchFilterGroups = sortByName(state.assetSearchFilterGroups)
+    }
+  },
+
   [REMOVE_ASSET_SEARCH_END](state, { searchQuery }) {
     const queryIndex = state.assetSearchQueries.findIndex(
       query => query.name === searchQuery.name
@@ -974,10 +1021,16 @@ const mutations = {
     }
   },
 
-  [DISPLAY_MORE_ASSETS](
-    state,
-    { taskTypeMap, taskStatusMap, taskMap, production }
-  ) {
+  [REMOVE_ASSET_SEARCH_FILTER_GROUP_END](state, { filterGroup }) {
+    const groupIndex = state.assetSearchFilterGroups.findIndex(
+      query => query.name === filterGroup.name
+    )
+    if (groupIndex >= 0) {
+      state.assetSearchFilterGroups.splice(groupIndex, 1)
+    }
+  },
+
+  [DISPLAY_MORE_ASSETS](state) {
     const assets = cache.result
     const newLength = state.displayedAssets.length + PAGE_SIZE
     if (newLength < assets.length + PAGE_SIZE) {
@@ -1000,11 +1053,11 @@ const mutations = {
     }
   },
 
-  [SET_CURRENT_PRODUCTION](state, production) {
+  [SET_CURRENT_PRODUCTION](state) {
     state.assetSearchText = ''
   },
 
-  [SET_PREVIEW](state, { entityId, taskId, previewId, taskMap }) {
+  [SET_PREVIEW](state, { entityId, previewId, taskMap }) {
     const asset = state.assetMap.get(entityId)
     if (asset) {
       asset.preview_file_id = previewId
@@ -1158,12 +1211,16 @@ const mutations = {
 
   [LOCK_ASSET](state, asset) {
     asset = state.assetMap.get(asset.id)
-    asset.lock = true
+    if (asset) {
+      asset.lock = !asset.lock ? 1 : asset.lock + 1
+    }
   },
 
   [UNLOCK_ASSET](state, asset) {
     asset = state.assetMap.get(asset.id)
-    asset.lock = false
+    if (asset) {
+      asset.lock = !asset.lock ? 0 : asset.lock - 1
+    }
   },
 
   [RESET_ALL](state) {

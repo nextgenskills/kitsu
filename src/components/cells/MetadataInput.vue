@@ -13,7 +13,7 @@
     "
     :value="getMetadataFieldValue(descriptor, entity)"
     v-if="
-      !descriptor.data_type || (descriptor.data_type === 'string' && isEditable)
+      (!descriptor.data_type || descriptor.data_type === 'string') && isEditable
     "
   />
   <!-- number input -->
@@ -108,6 +108,15 @@
       </option>
     </select>
   </span>
+  <!-- tag list input -->
+  <combobox-tag
+    :options="getDescriptorChoicesOptions(descriptor, false)"
+    :shy="true"
+    :value="getMetadataFieldValue(descriptor, entity)"
+    :with-margin="false"
+    @input="value => onMetadataFieldChanged(entity, descriptor, value)"
+    v-else-if="descriptor.data_type === 'taglist' && isEditable"
+  />
   <!-- default -->
   <span class="metadata-value selectable" v-else>
     {{ getMetadataFieldValue(descriptor, entity) }}
@@ -119,10 +128,14 @@ import { mapGetters } from 'vuex'
 import { descriptorMixin } from '@/components/mixins/descriptors'
 import { domMixin } from '@/components/mixins/dom'
 import { entityListMixin } from '@/components/mixins/entity_list'
+import ComboboxTag from '@/components/widgets/ComboboxTag'
 
 export default {
-  name: 'MetadataInput',
+  name: 'metadata-input',
   mixins: [descriptorMixin, domMixin, entityListMixin],
+  components: {
+    ComboboxTag
+  },
   props: {
     entity: {
       type: Object,
@@ -138,7 +151,7 @@ export default {
     }
   },
   computed: {
-    ...mapGetters(['isCurrentUserManager']),
+    ...mapGetters(['isCurrentUserManager', 'isCurrentUserSupervisor', 'user']),
     isEditable() {
       return (
         this.isCurrentUserManager ||
@@ -175,6 +188,8 @@ export default {
   width: 100%;
   background: transparent;
   border: 1px solid transparent;
+  text-overflow: ellipsis;
+  overflow: hidden;
   z-index: 100;
 
   &[type='checkbox'] {

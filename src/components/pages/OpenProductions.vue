@@ -1,5 +1,58 @@
 <template>
   <div class="open-productions page">
+    <div class="social-contributions flexcolumn" v-if="isContributions">
+      <h1 class="subtitle has-text-centered">
+        {{ $t('intro.title') }}
+      </h1>
+      <div class="flexrow">
+        <img
+          class="flexrow-item kitsu-with-body"
+          src="../../assets/illustrations/kitsu-band.png"
+        />
+        <div class="filler">
+          <span class="close-contributions" @click="hideContributions">
+            <x-icon size="0.9x" />
+          </span>
+          <p>
+            {{ $t('intro.main') }}
+          </p>
+          <ul>
+            <li>
+              {{ $t('intro.first') }}
+              <a href="https://github.com/cgwire/kitsu">GitHub</a>
+            </li>
+            <li>
+              {{ $t('intro.second') }}
+              <a href="https://twitter.com/cgwirekitsu">X</a>
+              {{ $t('main.or') }}
+              <a href="https://www.linkedin.com/company/cgwire/">LinkedIn</a>
+            </li>
+            <li>
+              {{ $t('intro.third') }}
+              <a href="https://discord.gg/VbCxtKN">Discord</a>
+            </li>
+            <li>
+              {{ $t('intro.four') }}
+              <a href="https://cgwire.canny.io">Canny</a>
+            </li>
+            <li>
+              {{ $t('intro.five') }}
+              <a href="https://liberapay.com/CGWire/donate">Liberapay</a>
+            </li>
+            <li>
+              {{ $t('intro.six') }}
+              <a href="https://cg-wire.com/pricing">offers</a>
+            </li>
+            <li>
+              {{ $t('intro.seven') }}
+            </li>
+          </ul>
+          <p>
+            {{ $t('intro.eight') }}
+          </p>
+        </div>
+      </div>
+    </div>
     <div class="has-text-centered" v-if="isOpenProductionsLoading">
       <spinner />
     </div>
@@ -25,6 +78,14 @@
       class="open-productions-box"
       v-if="!isOpenProductionsLoading && openProductions.length > 0"
     >
+      <div class="flexrow search-area" v-if="openProductions.length > 6">
+        <search-field
+          ref="search-field"
+          class="search-field"
+          @change="onSearchChange"
+        />
+      </div>
+
       <div
         :class="{
           'open-productions-list': true,
@@ -33,8 +94,14 @@
       >
         <div
           class="open-production has-text-centered"
+          v-if="!filteredProductions?.length"
+        >
+          {{ $t('main.search.no_result') }}
+        </div>
+        <div
+          class="open-production has-text-centered"
           :key="production.id"
-          v-for="production in openProductions"
+          v-for="production in filteredProductions"
         >
           <router-link :to="getPath(production)">
             <div
@@ -94,8 +161,13 @@
 <script>
 import { mapGetters, mapActions } from 'vuex'
 
-import colors from '@/lib/colors.js'
+import { XIcon } from 'vue-feather-icons'
+import { buildNameIndex } from '@/lib/indexing'
+import preferences from '@/lib/preferences'
+
+import colors from '@/lib/colors'
 import EditProductionModal from '@/components/modals/EditProductionModal'
+import SearchField from '@/components/widgets/SearchField'
 import Spinner from '@/components/widgets/Spinner'
 
 export default {
@@ -103,11 +175,16 @@ export default {
 
   components: {
     EditProductionModal,
-    Spinner
+    SearchField,
+    Spinner,
+    XIcon
   },
 
   data() {
     return {
+      isContributions: true,
+      filteredProductions: [],
+      search: '',
       errors: {
         edit: false
       },
@@ -119,9 +196,16 @@ export default {
       }
     }
   },
+
   mounted() {
-    this.setHelpSection('productions')
+    this.$refs['search-field']?.focus()
+    this.filteredProductions = this.openProductions
+    this.productionIndex = buildNameIndex(this.openProductions)
+    this.isContributions =
+      this.mainConfig.is_self_hosted &&
+      preferences.getPreference('open-productions:contributions') !== 'false'
   },
+
   computed: {
     ...mapGetters([
       'isCurrentUserAdmin',
@@ -129,12 +213,13 @@ export default {
       'isCurrentUserClient',
       'isOpenProductionsLoading',
       'lastProductionScreen',
+      'mainConfig',
       'openProductions'
     ])
   },
 
   methods: {
-    ...mapActions(['newProduction','setHelpSection']),
+    ...mapActions(['newProduction']),
 
     generateAvatar(production) {
       const firstLetter = production.name.length > 0 ? production.name[0] : 'P'
@@ -150,22 +235,30 @@ export default {
     },
 
     sectionPath(production, section) {
+      const routeName = production.homepage || section
       const route = {
-        name: section,
+        name: routeName,
         params: {
           production_id: production.id
         },
         query: {}
       }
       if (production.production_type === 'tvshow') {
-        route.name = `episode-${section}`
+        route.name = `episode-${routeName}`
         if (section !== 'edits') {
           route.params.episode_id = production.first_episode_id
         } else {
           route.params.episode_id = 'all'
         }
       }
-      if (['assets', 'shots', 'edits'].includes(section)) {
+      const isEntityPage = [
+        'assets',
+        'shots',
+        'edits',
+        'sequences',
+        'episodes'
+      ].includes(routeName)
+      if (isEntityPage) {
         route.query.search = ''
       }
       return route
@@ -198,6 +291,19 @@ export default {
 
     hideNewModal() {
       this.modals.isNewDisplayed = false
+    },
+
+    onSearchChange(search) {
+      if (search === '') {
+        this.filteredProductions = this.openProductions
+      } else {
+        this.filteredProductions = this.productionIndex[search]
+      }
+    },
+
+    hideContributions() {
+      this.isContributions = false
+      preferences.setPreference('open-productions:contributions', false)
     }
   },
 
@@ -205,7 +311,7 @@ export default {
 
   metaInfo() {
     return {
-      title: `${this.$t('productions.home.title')} - NextGen:RISE`
+      title: `${this.$t('productions.home.title')} - Kitsu`
     }
   }
 }
@@ -369,6 +475,44 @@ a.secondary:hover {
   padding-bottom: 3em;
 }
 
+.social-contributions {
+  background: var(--background);
+  border: 3px solid var(--selected);
+  box-shadow: 0 0 3px 3px var(--box-shadow-alt);
+  color: var(--text);
+  border-radius: 1em;
+  font-size: 1.1rem;
+  max-width: 800px;
+  margin-bottom: 0em;
+  margin-top: 2em;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 2em;
+  position: relative;
+
+  a {
+    color: $green;
+  }
+
+  ul {
+    margin-bottom: 1em;
+    margin-top: 1em;
+  }
+
+  .close-contributions {
+    cursor: pointer;
+    position: absolute;
+    right: 30px;
+    top: 15px;
+    width: 2px;
+  }
+
+  .kitsu-with-body {
+    margin-right: 2em;
+    width: 320px;
+  }
+}
+
 .big-button {
   background: $white;
   border: 1px solid $green;
@@ -384,6 +528,16 @@ a.secondary:hover {
 
   &:active {
     box-shadow: none;
+  }
+}
+
+.search-area {
+  justify-content: center;
+}
+
+.info {
+  img {
+    width: 800px;
   }
 }
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="field">
+  <div>
     <label class="label" v-if="label.length > 0">
       {{ label }}
     </label>
@@ -145,7 +145,11 @@ export default {
         return [...this.departmentsToTakeAccount]
       } else {
         return [
-          { name: '---', id: null, color: '#000000' },
+          {
+            color: '#AAA',
+            id: null,
+            name: this.$t('departments.no_department')
+          },
           ...this.departmentsToTakeAccount
         ]
       }
@@ -213,14 +217,14 @@ export default {
 
 .selected-department-line {
   background: $white;
-  padding: 0.4em;
+  padding: 0.2em;
   flex: 1;
 }
 
 .department-line {
   background: $white;
   cursor: pointer;
-  padding: 0.4em;
+  padding: 0.2em;
   margin: 0;
 
   &:hover {

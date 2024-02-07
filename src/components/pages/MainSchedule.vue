@@ -8,7 +8,7 @@
           </label>
           <datepicker
             wrapper-class="datepicker"
-            input-class="date-input input"
+            input-class="date-input input short"
             :language="locale"
             :disabled-dates="{ days: [6, 0] }"
             :monday-first="true"
@@ -23,7 +23,7 @@
           </label>
           <datepicker
             wrapper-class="datepicker"
-            input-class="date-input input"
+            input-class="date-input input short"
             :language="locale"
             :disabled-dates="{ days: [6, 0] }"
             :monday-first="true"
@@ -48,8 +48,8 @@
         :start-date="startDate"
         :zoom-level="zoomLevel"
         :hide-man-days="true"
+        :with-milestones="false"
         @item-changed="onScheduleItemChanged"
-        @change-zoom="changeZoom"
         @root-element-expanded="expandProductionElement"
       />
     </div>
@@ -79,7 +79,7 @@ import ComboboxNumber from '@/components/widgets/ComboboxNumber'
 import Schedule from '@/components/pages/schedule/Schedule'
 
 export default {
-  name: 'production-schedule',
+  name: 'main-schedule',
   components: {
     ComboboxNumber,
     Datepicker,
@@ -128,12 +128,10 @@ export default {
   methods: {
     ...mapActions(['editProduction', 'loadScheduleItems', 'saveScheduleItem']),
 
-    changeZoom(event) {
-      if (event.wheelDelta < 0 && this.zoomLevel > 1) this.zoomLevel--
-      if (event.wheelDelta > 0 && this.zoomLevel < 3) this.zoomLevel++
-    },
-
     reset() {
+      if (!this.openProductions.length) {
+        return
+      }
       this.scheduleItems = this.convertScheduleItems(this.openProductions)
       this.startDate = getFirstStartDate(this.scheduleItems)
       this.endDate = getLastEndDate(this.scheduleItems)

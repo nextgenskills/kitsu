@@ -3,11 +3,21 @@
     <list-page-header
       :title="$t('departments.title')"
       :new-entry-label="$t('departments.new_departments')"
+      :is-exportable="isActiveTab"
+      @export-clicked="onExportClicked"
       @new-clicked="onNewClicked"
     />
 
+    <route-tabs
+      class="mt2"
+      :active-tab="activeTab"
+      :tabs="tabs"
+      route-name="departments"
+    />
+
     <department-list
-      :entries="departments"
+      class="department-list"
+      :entries="departmentList"
       :is-loading="loading.departments"
       :is-error="errors.departments"
       @edit-clicked="onEditClicked"
@@ -37,24 +47,32 @@
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
-import DepartmentList from '@/components/lists/DepartmentList.vue'
-import ListPageHeader from '@/components/widgets/ListPageHeader'
-import EditDepartmentsModal from '@/components/modals/EditDepartmentsModal'
+
+import csv from '@/lib/csv'
+import stringHelpers from '@/lib/string'
+
 import DeleteModal from '@/components/modals/DeleteModal'
+import DepartmentList from '@/components/lists/DepartmentList.vue'
+import EditDepartmentsModal from '@/components/modals/EditDepartmentsModal'
+import ListPageHeader from '@/components/widgets/ListPageHeader'
+import RouteTabs from '@/components/widgets/RouteTabs'
 
 export default {
-  name: 'production-departments',
+  name: 'departments',
+
   components: {
     DeleteModal,
     DepartmentList,
     EditDepartmentsModal,
-    ListPageHeader
+    ListPageHeader,
+    RouteTabs
   },
-
-  props: {},
 
   data() {
     return {
+      activeTab: 'active',
+      departmentToEdit: null,
+      departmentToDelete: null,
       errors: {
         departments: false,
         edit: false,
@@ -69,25 +87,21 @@ export default {
         del: false,
         edit: false
       },
-      departmentToEdit: null,
-      departmentToDelete: null
-    }
-  },
-
-  computed: {
-    ...mapGetters(['departments']),
-    deleteText() {
-      if (this.departmentToDelete) {
-        return this.$t('departments.delete_text', {
-          name: this.departmentToDelete.name
-        })
-      } else {
-        return ''
-      }
+      tabs: [
+        {
+          name: 'active',
+          label: this.$t('main.active')
+        },
+        {
+          name: 'archived',
+          label: this.$t('main.archived')
+        }
+      ]
     }
   },
 
   mounted() {
+    this.activeTab = this.$route.query.tab || 'active'
     this.loading.departments = true
     this.errors.departments = false
     this.loadDepartments()
@@ -101,8 +115,47 @@ export default {
       })
   },
 
+  computed: {
+    ...mapGetters(['departments', 'archivedDepartments']),
+
+    isActiveTab() {
+      return this.activeTab === 'active'
+    },
+
+    departmentList() {
+      return this.isActiveTab ? this.departments : this.archivedDepartments
+    },
+
+    deleteText() {
+      if (this.departmentToDelete) {
+        return this.$t('departments.delete_text', {
+          name: this.departmentToDelete.name
+        })
+      } else {
+        return ''
+      }
+    }
+  },
+
   methods: {
     ...mapActions(['deleteDepartment', 'loadDepartments', 'newDepartement']),
+
+    onExportClicked() {
+      const name = stringHelpers.slugify(this.$t('departments.title'))
+      const headers = [
+        this.$t('main.type'),
+        this.$t('departments.fields.name'),
+        this.$t('departments.fields.color')
+      ]
+      const entries = [headers].concat(
+        this.departments.map(department => [
+          department.type,
+          department.name,
+          department.color
+        ])
+      )
+      csv.buildCsvFile(name, entries)
+    },
 
     onNewClicked() {
       this.departmentToEdit = { name: '', color: '#999999' }
@@ -152,8 +205,24 @@ export default {
         this.errors.del = true
       }
     }
+  },
+
+  watch: {
+    $route() {
+      this.activeTab = this.$route.query.tab
+    }
+  },
+
+  metaInfo() {
+    return {
+      title: `${this.$t('departments.title')} - Kitsu`
+    }
   }
 }
 </script>
 
-<style lang="scss" scoped></style>
+<style lang="scss" scoped>
+.department-list {
+  margin-top: 0;
+}
+</style>

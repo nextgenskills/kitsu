@@ -118,11 +118,14 @@
             </td>
             <td class="estimation number-cell">
               <input
-                v-if="isInDepartment(task) && selectionGrid[task.id]"
-                :ref="task.id + '-estimation'"
                 class="input"
+                min="0"
+                step="any"
+                type="number"
+                :ref="task.id + '-estimation'"
+                :value="formatDuration(task.estimation, false)"
                 @change="updateEstimation($event.target.value)"
-                :value="formatDuration(task.estimation)"
+                v-if="isInDepartment(task) && selectionGrid[task.id]"
               />
               <span v-else>
                 {{ formatDuration(task.estimation) }}
@@ -201,13 +204,14 @@
             @click="selectTask($event, index, task)"
             v-for="(task, index) in taskGroup.tasks"
           >
-            <entity-thumbnail
+            <entity-preview
               class="flexrow-item"
               :entity="getEntity(task.entity.id)"
-              :width="200"
               :height="133"
+              :width="200"
               :empty-width="200"
               :empty-height="133"
+              :show-movie="false"
               no-preview
               v-if="task.entity"
             />
@@ -241,13 +245,14 @@
         @click="selectTask($event, index, task)"
         v-for="(task, index) in displayedTasks"
       >
-        <entity-thumbnail
+        <entity-preview
           class="flexrow-item"
           :entity="getEntity(task.entity.id)"
-          :width="200"
           :height="133"
+          :width="200"
           :empty-width="200"
           :empty-height="133"
+          :show-movie="false"
           no-preview
           v-if="task.entity"
         />
@@ -300,6 +305,7 @@ import { formatListMixin } from '@/components/mixins/format'
 import { domMixin } from '@/components/mixins/dom'
 
 import DateField from '@/components/widgets/DateField'
+import EntityPreview from '@/components/widgets/EntityPreview'
 import EntityThumbnail from '@/components/widgets/EntityThumbnail'
 import PeopleAvatarWithMenu from '@/components/widgets/PeopleAvatarWithMenu'
 import TableInfo from '@/components/widgets/TableInfo'
@@ -312,6 +318,7 @@ export default {
 
   components: {
     DateField,
+    EntityPreview,
     EntityThumbnail,
     PeopleAvatarWithMenu,
     TableInfo,
@@ -430,9 +437,8 @@ export default {
     displayedTasks() {
       if (this.tasks && this.tasks.length > 0) {
         return this.tasks.slice(0, 60 * this.page)
-      } else {
-        return []
       }
+      return []
     },
 
     tasksByParent() {
@@ -500,10 +506,9 @@ export default {
 
     getTaskName(task) {
       if (this.entityType === 'Shot') {
-        return task.sequence_name + ' / ' + this.getEntity(task.entity.id).name
-      } else {
-        return task.entity_name
+        return `${task.sequence_name} / ${this.getEntity(task.entity.id).name}`
       }
+      return task.entity_name
     },
 
     isTaskChanged(task, data) {
@@ -622,7 +627,7 @@ export default {
 
     formatDate(date) {
       if (date) return moment(date).format('YYYY-MM-DD')
-      else return ''
+      return ''
     },
 
     isEstimationBurned(task) {
@@ -643,7 +648,7 @@ export default {
     },
 
     getEntity(entityId) {
-      return this[`${this.entityType.toLowerCase()}Map`].get(entityId)
+      return this[`${this.entityType.toLowerCase()}Map`].get(entityId) || {}
     },
 
     onKeyDown(event) {
@@ -713,7 +718,7 @@ export default {
     },
 
     scrollToLine(taskId) {
-      const taskLine = this.$refs['task-' + taskId]
+      const taskLine = this.$refs[`task-${taskId}`]
       if (taskLine && this.$refs.body) {
         const margin = 30
         const rect = taskLine[0].getBoundingClientRect()
@@ -737,16 +742,14 @@ export default {
       } else if (this.isCurrentUserSupervisor) {
         if (this.user.departments.length === 0) {
           return true
-        } else {
-          const taskType = this.taskTypeMap.get(task.task_type_id)
-          return (
-            taskType.department_id &&
-            this.user.departments.includes(taskType.department_id)
-          )
         }
-      } else {
-        return false
+        const taskType = this.taskTypeMap.get(task.task_type_id)
+        return (
+          taskType.department_id &&
+          this.user.departments.includes(taskType.department_id)
+        )
       }
+      return false
     },
 
     resetSelection() {
@@ -781,7 +784,7 @@ export default {
           .map(personId => {
             const person = this.personMap.get(personId)
             if (person) return person.name
-            else return ''
+            return ''
           })
           .join(', ')
 
@@ -1031,5 +1034,19 @@ td.retake-count {
   tr.task-line {
     cursor: pointer;
   }
+}
+
+.error {
+  color: $red;
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
 }
 </style>

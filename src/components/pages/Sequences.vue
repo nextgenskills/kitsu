@@ -9,7 +9,6 @@
               :can-save="true"
               :active="isSearchActive"
               @change="onSearchChange"
-              @enter="saveSearchQuery"
               @save="saveSearchQuery"
               placeholder="ex: e01 sequence=wip"
             />
@@ -38,6 +37,7 @@
           <div class="query-list mt1">
             <search-query-list
               :queries="sequenceSearchQueries"
+              type="sequence"
               @change-search="changeSearch"
               @remove-search="removeSearchQuery"
               v-if="!isSequencesLoading && !initialLoading"
@@ -148,12 +148,14 @@
 
     <add-thumbnails-modal
       ref="add-thumbnails-modal"
+      entity-type="Sequence"
       parent="sequences"
       :active="modals.isAddThumbnailsDisplayed"
       :is-loading="loading.addThumbnails"
       :is-error="errors.addThumbnails"
       @cancel="hideAddThumbnailsModal"
       @confirm="confirmAddThumbnails"
+      v-if="false"
     />
 
     <build-filter-modal
@@ -246,9 +248,9 @@ export default {
       sequenceToEdit: null,
       formData: null,
       genericColumns: [
-        'metadata_column_name => text value',
-        'task_type_name => task_status_name',
-        'task_type_name comment => comment text'
+        'Metadata column name (text value)',
+        'Task type name (task status name value)',
+        'Task type name + comment (text value)'
       ],
       historyEdit: {},
       initialLoading: true,
@@ -280,6 +282,7 @@ export default {
         deleteMetadata: false,
         edit: false,
         importing: false,
+        savingSearch: false,
         sequence: false,
         stay: false
       },
@@ -309,7 +312,7 @@ export default {
       this.searchField.setValue(this.sequenceSearchText)
     }
     if (this.$route.query.search && this.$route.query.search.length > 0) {
-      searchQuery = '' + this.$route.query.search
+      searchQuery = `${this.$route.query.search}`
     }
     if (searchQuery === 'undefined') searchQuery = ''
     this.$refs['sequence-list'].setScrollPosition(
@@ -387,11 +390,11 @@ export default {
     ]),
 
     renderColumns() {
-      var collection = [...this.dataMatchers, ...this.optionalColumns]
+      const collection = [...this.dataMatchers, ...this.optionalColumns]
 
       this.productionSequenceTaskTypes.forEach(item => {
         collection.push(item.name)
-        collection.push(item.name + ' comment')
+        collection.push(`${item.name} comment`)
       })
       return collection
     },
@@ -502,7 +505,15 @@ export default {
     },
 
     saveSearchQuery(searchQuery) {
-      this.saveSequenceSearch(searchQuery).catch(console.error)
+      if (this.loading.savingSearch) {
+        return
+      }
+      this.loading.savingSearch = true
+      this.saveSequenceSearch(searchQuery)
+        .catch(console.error)
+        .finally(() => {
+          this.loading.savingSearch = false
+        })
     },
 
     removeSearchQuery(searchQuery) {
@@ -609,9 +620,8 @@ export default {
       const sequence = this.sequenceToDelete
       if (sequence) {
         return this.$t('sequences.delete_text', { name: sequence.name })
-      } else {
-        return ''
       }
+      return ''
     }
   },
 
@@ -644,7 +654,7 @@ export default {
       if (!this.isSequencesLoading) {
         let searchQuery = ''
         if (this.$route.query.search && this.$route.query.search.length > 0) {
-          searchQuery = '' + this.$route.query.search
+          searchQuery = `${this.$route.query.search}`
         }
         this.initialLoading = false
         this.$refs['sequence-search-field'].setValue(searchQuery)

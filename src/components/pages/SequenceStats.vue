@@ -6,7 +6,6 @@
         ref="sequence-search-field"
         :can-save="true"
         @change="onSearchChange"
-        @enter="saveSearchQuery"
         @save="saveSearchQuery"
         placeholder="ex: e01 s01 anim=wip"
       />
@@ -42,6 +41,7 @@
     <div class="query-list mt1">
       <search-query-list
         :queries="sequenceSearchQueries"
+        type="sequenceStat"
         @change-search="changeSearch"
         @remove-search="removeSearchQuery"
       />
@@ -98,7 +98,10 @@ export default {
       displayModeOptions: [
         { label: 'pie', value: 'pie' },
         { label: 'count', value: 'count' }
-      ]
+      ],
+      loading: {
+        savingSearch: false
+      }
     }
   },
 
@@ -191,7 +194,15 @@ export default {
     },
 
     saveSearchQuery(searchQuery) {
-      this.saveSequenceSearch(searchQuery).catch(console.error)
+      if (this.loading.savingSearch) {
+        return
+      }
+      this.loading.savingSearch = true
+      this.saveSequenceSearch(searchQuery)
+        .catch(console.error)
+        .finally(() => {
+          this.loading.savingSearch = false
+        })
     },
 
     removeSearchQuery(searchQuery) {

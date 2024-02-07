@@ -15,7 +15,7 @@
           {{ $t('tasks.change_preview') }}
         </h1>
         <h1 class="title" v-else>
-          {{ $t('tasks.add_preview') }}
+          {{ isConcept ? $t('concepts.add_concept') : $t('tasks.add_preview') }}
         </h1>
 
         <p>
@@ -25,15 +25,19 @@
         <file-upload
           ref="preview-field"
           :accept="extensions"
-          :multiple="true"
-          :label="$t('main.select_file')"
           :is-primary="false"
+          :label="$t('main.select_file')"
+          :multiple="isMultiple"
           @fileselected="onFileSelected"
           hide-file-names
         />
 
         <p class="error" v-if="isError">
-          {{ $t('tasks.add_preview_error') }}
+          {{
+            isConcept
+              ? $t('concepts.add_concept_error')
+              : $t('tasks.add_preview_error')
+          }}
         </p>
 
         <h3 class="subtitle has-text-centered" v-if="forms.length > 0">
@@ -73,9 +77,9 @@
           </template>
         </p>
 
-        <div class="mt1 message">
+        <div class="mt1 message" v-if="message">
           <div class="message-body">
-            {{ $t('tasks.revision_preview_file') }}
+            {{ $t(message) }}
           </div>
         </div>
 
@@ -89,7 +93,13 @@
             }"
             @click="$emit('confirm', forms)"
           >
-            {{ $t('tasks.add_revision_confirm') }}
+            {{
+              confirmLabel?.length
+                ? confirmLabel
+                : isConcept
+                  ? $t('main.confirmation')
+                  : $t('tasks.add_revision_confirm')
+            }}
           </a>
           <button @click="$emit('cancel')" class="button is-link">
             {{ $t('main.cancel') }}
@@ -103,6 +113,7 @@
 <script>
 import { mapGetters, mapActions } from 'vuex'
 import { modalMixin } from '@/components/modals/base_modal'
+
 import files from '@/lib/files'
 import FileUpload from '@/components/widgets/FileUpload.vue'
 
@@ -119,11 +130,15 @@ export default {
       type: Boolean,
       default: false
     },
-    isLoading: {
-      type: Boolean,
-      default: false
+    confirmLabel: {
+      type: String,
+      default: ''
     },
-    isError: {
+    extensions: {
+      type: String,
+      default: files.ALL_EXTENSIONS_STRING
+    },
+    isConcept: {
       type: Boolean,
       default: false
     },
@@ -131,9 +146,21 @@ export default {
       type: Boolean,
       default: false
     },
-    extensions: {
+    isError: {
+      type: Boolean,
+      default: false
+    },
+    isLoading: {
+      type: Boolean,
+      default: false
+    },
+    isMultiple: {
+      type: Boolean,
+      default: true
+    },
+    message: {
       type: String,
-      default: files.ALL_EXTENSIONS_STRING
+      default: 'tasks.revision_preview_file'
     },
     title: {
       type: String,
@@ -158,8 +185,12 @@ export default {
   methods: {
     ...mapActions([]),
 
+    setFiles(files) {
+      this.previewField.filesChange('file', files)
+    },
+
     onFileSelected(forms) {
-      this.forms = this.forms.concat(forms)
+      this.forms = this.isMultiple ? this.forms.concat(forms) : [forms]
       this.$emit('fileselected', this.forms)
     },
 
@@ -235,6 +266,9 @@ export default {
 
 .upload-previews {
   text-align: center;
+  padding: 1.5em;
+  max-height: 40vh;
+  overflow-y: auto;
 }
 
 .subtitle {

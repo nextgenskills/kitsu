@@ -11,19 +11,12 @@
       }"
     >
       <img
-        class="avatar-image"
-        :src="avatarPath"
-        v-if="person.has_avatar && noCache"
+        :loading="this.isLazy ? 'lazy' : undefined"
+        alt=""
+        :src="person.avatarPath"
+        v-if="person.has_avatar"
       />
-      <img
-        class="avatar-image"
-        v-lazy="avatarPath"
-        :key="avatarKey"
-        v-else-if="person.has_avatar"
-      />
-      <span v-else>
-        {{ initials }}
-      </span>
+      <template v-else>{{ person.initials }}</template>
     </span>
 
     <div class="avatar-menu">
@@ -32,11 +25,15 @@
         class="menu-button flexrow"
       >
         <user-icon class="flexrow-item" size="1.2x" />
-        <span class="flexrow-item">Open {{ person.name }} page</span>
+        <span class="flexrow-item">
+          {{ $t('main.avatar.open_page', { personName: person.name }) }}
+        </span>
       </router-link>
       <div class="menu-button flexrow" @click.stop="$emit('unassign', person)">
         <user-minus-icon class="flexrow-item" size="1.2x" />
-        <span class="flexrow-item">Unassign {{ person.name }}</span>
+        <span class="flexrow-item">
+          {{ $t('main.avatar.unassign', { personName: person.name }) }}
+        </span>
       </div>
     </div>
   </div>
@@ -46,19 +43,11 @@
 import { UserIcon, UserMinusIcon } from 'vue-feather-icons'
 
 export default {
-  name: 'person-avatar',
+  name: 'people-avatar-with-menu',
 
   components: {
     UserIcon,
     UserMinusIcon
-  },
-
-  data() {
-    return {
-      avatarPath: '',
-      avatarKey: '',
-      initials: ''
-    }
   },
 
   props: {
@@ -69,36 +58,25 @@ export default {
         color: '#FFF'
       })
     },
-    size: { type: Number, default: 40 },
-    'font-size': { type: Number, default: 18 },
-    'is-link': { type: Boolean, default: true },
-    'no-cache': { type: Boolean, default: false },
-    isMenu: { type: Boolean, default: false }
-  },
-
-  created() {
-    this.reloadAvatar()
-  },
-
-  methods: {
-    reloadAvatar() {
-      this.avatarPath =
-        this.person.avatarPath + '?unique=' + this.person.uniqueHash
-      this.avatarKey = this.person.id + '-' + this.person.uniqueHash
-    }
-  },
-
-  mounted() {
-    this.initials = this.person.initials
-  },
-
-  watch: {
-    person() {
-      this.reloadAvatar()
+    size: {
+      type: Number,
+      default: 40
     },
-
-    'person.uniqueHash'() {
-      this.reloadAvatar()
+    fontSize: {
+      type: Number,
+      default: 18
+    },
+    isLink: {
+      type: Boolean,
+      default: true
+    },
+    isLazy: {
+      type: Boolean,
+      default: true
+    },
+    isMenu: {
+      type: Boolean,
+      default: false
     }
   }
 }
@@ -118,10 +96,6 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.avatar span {
-  flex: 1;
 }
 
 .avatar a {

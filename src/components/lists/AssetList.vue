@@ -1,6 +1,6 @@
 <template>
   <div class="data-list">
-    <div class="datatable-wrapper" ref="body" v-scroll="onBodyScroll">
+    <div ref="body" class="datatable-wrapper" v-scroll="onBodyScroll">
       <table-header-menu
         ref="headerMenu"
         :is-minimized="hiddenColumns[lastHeaderMenuDisplayed]"
@@ -62,10 +62,10 @@
               :left="
                 offsets['editor-' + j] ? `${offsets['editor-' + j]}px` : '0'
               "
+              is-stick
               @show-metadata-header-menu="
                 event => showMetadataHeaderMenu(descriptor.id, event)
               "
-              is-stick
               v-for="(descriptor, j) in stickedVisibleMetadataDescriptors"
             />
 
@@ -99,6 +99,7 @@
               v-if="
                 isCurrentUserManager &&
                 isShowInfos &&
+                !isAssetsOnly &&
                 metadataDisplayHeaders.readyFor
               "
             >
@@ -277,6 +278,7 @@
               class="metadata-descriptor datatable-row-header"
               :title="asset.data ? asset.data[descriptor.field_name] : ''"
               :style="{
+                'z-index': 1000 - i, // Needed for combo to be above the next cell
                 left: offsets['editor-' + j]
                   ? `${offsets['editor-' + j]}px`
                   : '0'
@@ -327,6 +329,7 @@
               v-if="
                 isCurrentUserManager &&
                 isShowInfos &&
+                !isAssetsOnly &&
                 metadataDisplayHeaders.readyFor
               "
             >
@@ -427,32 +430,32 @@
           </tr>
         </tbody>
       </table>
-    </div>
 
-    <table-info :is-loading="isLoading" :is-error="isError" />
+      <div
+        class="has-text-centered"
+        v-if="isEmptyList && !isCurrentUserClient && !isLoading"
+      >
+        <p class="info">
+          <img src="../../assets/illustrations/empty_asset.png" />
+        </p>
+        <p class="info">{{ $t('assets.empty_list') }}</p>
+        <button-simple
+          class="level-item big-button"
+          :text="$t('assets.new_assets')"
+          @click="$emit('new-clicked')"
+        />
+      </div>
+      <div
+        class="has-text-centered"
+        v-if="isEmptyList && isCurrentUserClient && !isLoading"
+      >
+        <p class="info">
+          <img src="../../assets/illustrations/empty_asset.png" />
+        </p>
+        <p class="info">{{ $t('assets.empty_list_client') }}</p>
+      </div>
 
-    <div
-      class="has-text-centered"
-      v-if="isEmptyList && !isCurrentUserClient && !isLoading"
-    >
-      <p class="info">
-        <img src="../../assets/illustrations/empty_asset.png" />
-      </p>
-      <p class="info">{{ $t('assets.empty_list') }}</p>
-      <button-simple
-        class="level-item big-button"
-        :text="$t('assets.new_assets')"
-        @click="$emit('new-clicked')"
-      />
-    </div>
-    <div
-      class="has-text-centered"
-      v-if="isEmptyList && isCurrentUserClient && !isLoading"
-    >
-      <p class="info">
-        <img src="../../assets/illustrations/empty_asset.png" />
-      </p>
-      <p class="info">{{ $t('assets.empty_list_client') }}</p>
+      <table-info :is-loading="isLoading" :is-error="isError" />
     </div>
 
     <p class="has-text-centered nb-assets" v-if="!isEmptyList && !isLoading">
@@ -676,6 +679,10 @@ export default {
         },
         ...sortTaskTypes(this.productionShotTaskTypes, this.currentProduction)
       ]
+    },
+
+    isAssetsOnly() {
+      return this.currentProduction.production_type === 'assets'
     }
   },
 
@@ -710,7 +717,7 @@ export default {
       if (this.isSelectableMap[key] === undefined) {
         const taskType = this.taskTypeMap.get(columnId)
         const assetType = this.assetTypeMap.get(asset.asset_type_id)
-        let taskTypes = assetType.task_types || []
+        let taskTypes = assetType?.task_types || []
         if (taskTypes.length === 0) {
           taskTypes = this.productionAssetTaskTypes.map(t => t.id)
         }
@@ -780,10 +787,6 @@ export default {
 
     getIndex(i, k) {
       return this.getEntityLineNumber(this.displayedAssets, i, k)
-    },
-
-    newAssetPath() {
-      return this.getPath('new-asset')
     },
 
     assetPath(assetId) {
@@ -974,6 +977,7 @@ td.ready-for {
 
 .datatable-wrapper {
   min-height: 200px;
+  flex: 1;
 }
 
 .datatable-row th.name {
@@ -1003,6 +1007,7 @@ input[type='number'] {
 
 td.metadata-descriptor {
   height: 3.1rem;
+  max-width: 120px;
   padding: 0;
 }
 </style>

@@ -359,7 +359,7 @@ const actions = {
         return Promise.resolve(edits)
       })
       .catch(err => {
-        console.error('an error occured while loading edits', err)
+        console.error('an error occurred while loading edits', err)
         commit(LOAD_EDITS_ERROR)
         return Promise.resolve([])
       })
@@ -371,7 +371,7 @@ const actions = {
    */
   loadEdit({ commit, state, rootGetters }, editId) {
     const edit = rootGetters.editMap.get(editId)
-    if (edit && edit.lock) return
+    if (edit?.lock) return
 
     const personMap = rootGetters.personMap
     const production = rootGetters.currentProduction
@@ -404,7 +404,7 @@ const actions = {
           (!isTVShow || ed.parent_id === edit.parent_id)
       )
     ) {
-      return Promise.reject(new Error('Edit already exsists'))
+      return Promise.reject(new Error('Edit already exists'))
     }
     return editsApi.newEdit(edit).then(edit => {
       commit(NEW_EDIT_END, edit)
@@ -427,11 +427,10 @@ const actions = {
   editEdit({ commit, state }, data) {
     commit(LOCK_EDIT, data)
     commit(EDIT_EDIT_END, data)
-    return editsApi.updateEdit(data).then(edit => {
+    return editsApi.updateEdit(data).finally(() => {
       setTimeout(() => {
-        commit(UNLOCK_EDIT, edit)
+        commit(UNLOCK_EDIT, data)
       }, 2000)
-      return Promise.resolve(edit)
     })
   },
 
@@ -499,28 +498,22 @@ const actions = {
   },
 
   saveEditSearch({ commit, rootGetters }, searchQuery) {
-    const query = state.editSearchQueries.find(
-      query => query.name === searchQuery
-    )
-    const production = rootGetters.currentProduction
-
-    if (!query) {
-      return peopleApi
-        .createFilter('edit', searchQuery, searchQuery, production.id, null)
-        .then(searchQuery => {
-          commit(SAVE_EDIT_SEARCH_END, { searchQuery, production })
-          return searchQuery
-        })
-    } else {
-      return Promise.resolve()
+    if (state.editSearchQueries.some(query => query.name === searchQuery)) {
+      return
     }
+    const production = rootGetters.currentProduction
+    return peopleApi
+      .createFilter('edit', searchQuery, searchQuery, production.id, null)
+      .then(searchQuery => {
+        commit(SAVE_EDIT_SEARCH_END, { searchQuery, production })
+        return searchQuery
+      })
   },
 
   removeEditSearch({ commit, rootGetters }, searchQuery) {
     const production = rootGetters.currentProduction
     return peopleApi.removeFilter(searchQuery).then(() => {
       commit(REMOVE_EDIT_SEARCH_END, { searchQuery, production })
-      return Promise.resolve()
     })
   },
 
@@ -1090,12 +1083,16 @@ const mutations = {
 
   [LOCK_EDIT](state, edit) {
     edit = state.editMap.get(edit.id)
-    if (edit) edit.lock = true
+    if (edit) {
+      edit.lock = !edit.lock ? 1 : edit.lock + 1
+    }
   },
 
   [UNLOCK_EDIT](state, edit) {
     edit = state.editMap.get(edit.id)
-    if (edit) edit.lock = false
+    if (edit) {
+      edit.lock = !edit.lock ? 0 : edit.lock - 1
+    }
   },
 
   [RESET_ALL](state) {

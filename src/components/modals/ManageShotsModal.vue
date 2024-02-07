@@ -44,7 +44,7 @@
               <input
                 class="input"
                 ref="addEpisodeInput"
-                placeholder="EP01"
+                :placeholder="$t('episodes.fields.placeholder')"
                 type="text"
                 @keyup.tab="focusAddSequence"
                 @keyup.enter="addEpisode"
@@ -85,7 +85,7 @@
               <input
                 class="input"
                 ref="addSequenceInput"
-                placeholder="SQ01"
+                :placeholder="$t('sequences.fields.placeholder')"
                 type="text"
                 @keyup.enter="addSequence"
                 v-model="names.sequence"
@@ -118,7 +118,7 @@
             <div class="field">
               <input
                 class="input"
-                placeholder="SH01"
+                :placeholder="$t('shots.fields.placeholder')"
                 ref="addShotInput"
                 type="text"
                 @keyup.enter="addShot"
@@ -162,7 +162,7 @@ import stringHelpers from '@/lib/string'
 import { sortByName } from '@/lib/sorting'
 
 export default {
-  name: 'manage-shot-modal',
+  name: 'manage-shots-modal',
   mixins: [modalMixin],
 
   components: {

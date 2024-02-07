@@ -88,7 +88,7 @@
           />
           <span class="filler"></span>
           <combobox-number
-            class="flexrow-item zoom-level"
+            class="flexrow-item zoom-level mb0"
             :label="$t('schedule.zoom_level')"
             :options="zoomOptions"
             v-model="zoomLevel"
@@ -104,12 +104,10 @@
         </div>
 
         <div ref="query">
-          <div
-            class="query-list"
-            v-show="isActiveTab('todos') || isActiveTab('timesheets')"
-          >
+          <div class="query-list">
             <search-query-list
               :queries="personTaskSearchQueries"
+              type="person"
               @change-search="changeSearch"
               @remove-search="removeSearchQuery"
             />
@@ -157,13 +155,16 @@
         <div v-if="isActiveTab('schedule')">
           <schedule
             ref="schedule-widget"
-            :start-date="tasksStartDate"
-            :end-date="tasksEndDate"
+            :start-date="tasksStartDate.clone().add(-3, 'months')"
+            :end-date="tasksEndDate.clone().add(3, 'months')"
             :hierarchy="scheduleItems"
             :zoom-level="zoomLevel"
             :height="scheduleHeight"
             :is-loading="isTasksLoading"
             :is-estimation-linked="true"
+            :with-milestones="false"
+            @item-changed="saveTaskScheduleItem"
+            @estimation-changed="event => saveTaskScheduleItem(event.item)"
             v-if="scheduleItems.length > 0"
           />
           <div class="has-text-centered" v-else>
@@ -185,7 +186,13 @@ import { mapGetters, mapActions } from 'vuex'
 
 import { formatListMixin } from '@/components/mixins/format'
 import colors from '@/lib/colors'
-import { getFirstStartDate, getLastEndDate, parseDate } from '@/lib/time'
+import {
+  daysToMinutes,
+  getBusinessDays,
+  getFirstStartDate,
+  getLastEndDate,
+  parseDate
+} from '@/lib/time'
 
 import Combobox from '@/components/widgets/Combobox'
 import ComboboxNumber from '@/components/widgets/ComboboxNumber'
@@ -218,6 +225,9 @@ export default {
       currentSort: 'entity_name',
       isTasksLoading: false,
       isTasksLoadingError: false,
+      loading: {
+        savingSearch: false
+      },
       person: null,
       scheduleHeight: 0,
       selectedDate: moment().format('YYYY-MM-DD'),
@@ -247,7 +257,10 @@ export default {
     }
     setTimeout(() => {
       if (this.searchField) this.searchField.focus()
-    }, 100)
+      if (this.$refs['schedule-widget']) {
+        this.$refs['schedule-widget'].scrollToDate(this.tasksStartDate)
+      }
+    }, 300)
     this.loadPerson(this.$route.params.person_id)
     window.addEventListener('resize', this.resetScheduleHeight)
   },
@@ -362,7 +375,7 @@ export default {
     },
 
     tasksStartDate() {
-      if (this.scheduleItems.length > 0) {
+      if (this.scheduleTasks.length) {
         return getFirstStartDate(this.scheduleTasks)
       } else {
         return moment()
@@ -370,7 +383,7 @@ export default {
     },
 
     tasksEndDate() {
-      if (this.scheduleItems.length > 0) {
+      if (this.scheduleTasks.length) {
         return getLastEndDate(this.scheduleTasks)
       } else {
         return moment().add(15, 'days')
@@ -378,11 +391,7 @@ export default {
     },
 
     scheduleTasks() {
-      let children = []
-      this.scheduleItems.forEach(item => {
-        children = children.concat(item.children)
-      })
-      return children
+      return this.scheduleItems.flatMap(item => item.children)
     },
 
     scheduleItems() {
@@ -430,22 +439,21 @@ export default {
       'setDayOff',
       'setPersonTasksScrollPosition',
       'setTimeSpent',
-      'unsetDayOff'
+      'unsetDayOff',
+      'updateTask'
     ]),
 
     resetScheduleHeight() {
       this.$nextTick(() => {
         if (this.isActiveTab('schedule')) {
-          const pageHeight = this.$refs.page.offsetHeight
-          const headerHeight = this.$refs.header.offsetHeight
-          const tabsHeight = this.$refs.tabs.offsetHeight
-          const searchHeight = this.$refs.search.offsetHeight
-          const queryHeight = this.$refs.query.offsetHeight
+          const pageHeight = this.$refs.page?.offsetHeight || 0
+          const headerHeight = this.$refs.header?.offsetHeight || 0
+          const tabsHeight = this.$refs.tabs?.offsetHeight || 0
+          const searchHeight = this.$refs.search?.offsetHeight || 0
+          const queryHeight = this.$refs.query?.offsetHeight || 0
           this.scheduleHeight =
             pageHeight - headerHeight - tabsHeight - searchHeight - queryHeight
-          if (this.$refs['schedule-widget']) {
-            this.$refs['schedule-widget'].resetScheduleSize()
-          }
+          this.$refs['schedule-widget']?.resetScheduleSize()
         }
       })
     },
@@ -463,7 +471,7 @@ export default {
       }
     },
 
-    buildTaskScheduleItem(rootElement, task) {
+    buildTaskScheduleItem(parentElement, task) {
       let startDate = moment()
       let endDate
 
@@ -481,7 +489,7 @@ export default {
         startDate = parseDate(task.real_start_date)
       }
 
-      const estimation = this.formatDuration(task.estimation)
+      const estimation = task.estimation
       if (task.due_date) {
         endDate = parseDate(task.due_date)
       } else if (task.end_date) {
@@ -497,14 +505,14 @@ export default {
       return {
         ...task,
         name: task.full_entity_name + ' / ' + taskType.name,
-        startDate: startDate,
-        endDate: endDate,
+        startDate,
+        endDate,
         expanded: false,
         loading: false,
         man_days: estimation,
         editable: false,
         unresizable: false,
-        parentElement: rootElement,
+        parentElement,
         color: taskType.color,
         children: []
       }
@@ -576,19 +584,21 @@ export default {
     },
 
     saveSearchQuery(searchQuery) {
+      if (this.loading.savingSearch) {
+        return
+      }
+      this.loading.savingSearch = true
       this.savePersonTasksSearch(searchQuery)
-        .then(() => {})
-        .catch(err => {
-          if (err) console.error(err)
+        .catch(console.error)
+        .finally(() => {
+          this.loading.savingSearch = false
         })
     },
 
     removeSearchQuery(searchQuery) {
-      this.removePersonTasksSearch(searchQuery)
-        .then(() => {})
-        .catch(err => {
-          if (err) console.error(err)
-        })
+      this.removePersonTasksSearch(searchQuery).catch(err => {
+        if (err) console.error(err)
+      })
     },
 
     updateActiveTab() {
@@ -625,6 +635,22 @@ export default {
         date: this.selectedDate
       }
       this.unsetDayOff(dayOff)
+    },
+
+    saveTaskScheduleItem(item) {
+      const daysLength = getBusinessDays(item.startDate, item.endDate)
+      const estimation = daysToMinutes(this.organisation, daysLength)
+      item.man_days = estimation
+      if (item.startDate && item.endDate) {
+        this.updateTask({
+          taskId: item.id,
+          data: {
+            estimation,
+            start_date: item.startDate.format('YYYY-MM-DD'),
+            due_date: item.endDate.format('YYYY-MM-DD')
+          }
+        })
+      }
     }
   },
 
@@ -646,6 +672,17 @@ export default {
 
     activeTab() {
       this.resetScheduleHeight()
+      this.$nextTick(() => {
+        if (this.$refs['schedule-widget']) {
+          this.$refs['schedule-widget'].scrollToDate(this.tasksStartDate)
+        }
+      })
+    },
+
+    zoomLevel() {
+      if (this.$refs['schedule-widget']) {
+        this.$refs['schedule-widget'].scrollToDate(this.tasksStartDate)
+      }
     }
   }
 }
@@ -674,7 +711,8 @@ export default {
 }
 
 .query-list {
-  margin-top: 1em;
+  margin: 0;
+  margin-bottom: 1em;
 }
 
 .task-tabs {
@@ -711,5 +749,13 @@ export default {
 
 .main-column {
   border-right: 3px solid $light-grey;
+}
+
+.zoom-level {
+  margin-top: -0.5em;
+}
+
+.field {
+  margin-bottom: 0;
 }
 </style>

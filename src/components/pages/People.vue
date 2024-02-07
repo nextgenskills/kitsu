@@ -33,21 +33,28 @@
         class="search flexrow-item"
         :can-save="true"
         @change="onSearchChange"
-        @enter="saveSearchQuery"
         @save="saveSearchQuery"
         placeholder="ex: John Doe"
       />
-      <button-simple
-        class="flexrow-item filter-button"
-        :title="$t('entities.build_filter.title')"
-        icon="funnel"
-        @click="() => (modals.isBuildFilterDisplayed = true)"
+      <combobox-department
+        class="combobox-department flexrow-item"
+        :label="$t('main.department')"
+        v-model="selectedDepartment"
+      />
+      <combobox-styled
+        class="flexrow-item"
+        :label="$t('people.fields.role')"
+        :options="roleOptions"
+        locale-key-prefix="people.role."
+        no-margin
+        v-model="role"
       />
     </div>
 
     <div class="query-list">
       <search-query-list
         :queries="peopleSearchQueries"
+        type="people"
         @change-search="changeSearch"
         @remove-search="removeSearchQuery"
         v-if="!isPeopleLoading"
@@ -55,7 +62,7 @@
     </div>
 
     <people-list
-      :entries="displayedPeople"
+      :entries="currentPeople"
       :is-loading="isPeopleLoading"
       :is-error="isPeopleLoadingError"
       @edit-clicked="onEditClicked"
@@ -138,7 +145,10 @@ import { mapGetters, mapActions } from 'vuex'
 import csv from '@/lib/csv'
 import ButtonHrefLink from '@/components/widgets/ButtonHrefLink'
 import ButtonSimple from '@/components/widgets/ButtonSimple'
+import BuildPeopleFilterModal from '@/components/modals/BuildPeopleFilterModal'
 import ChangePasswordModal from '@/components/modals/ChangePasswordModal'
+import ComboboxDepartment from '@/components/widgets/ComboboxDepartment'
+import ComboboxStyled from '@/components/widgets/ComboboxStyled'
 import EditPersonModal from '@/components/modals/EditPersonModal'
 import HardDeleteModal from '@/components/modals/HardDeleteModal'
 import ImportModal from '@/components/modals/ImportModal'
@@ -148,7 +158,6 @@ import PageTitle from '@/components/widgets/PageTitle'
 import SearchField from '@/components/widgets/SearchField'
 import SearchQueryList from '@/components/widgets/SearchQueryList'
 import { searchMixin } from '@/components/mixins/search'
-import BuildPeopleFilterModal from '@/components/modals/BuildPeopleFilterModal'
 
 export default {
   name: 'people',
@@ -158,6 +167,8 @@ export default {
     ButtonHrefLink,
     ButtonSimple,
     ChangePasswordModal,
+    ComboboxStyled,
+    ComboboxDepartment,
     EditPersonModal,
     HardDeleteModal,
     ImportModal,
@@ -173,6 +184,16 @@ export default {
       csvColumns: ['First Name', 'Last Name'],
       optionalCsvColumns: ['Phone', 'Role'],
       dataMatchers: ['Email'],
+      role: 'all',
+      roleOptions: [
+        { label: 'all', value: 'all' },
+        { label: 'admin', value: 'admin' },
+        { label: 'client', value: 'client' },
+        { label: 'manager', value: 'manager' },
+        { label: 'supervisor', value: 'supervisor' },
+        { label: 'user', value: 'user' },
+        { label: 'vendor', value: 'vendor' }
+      ],
       errors: {
         del: false,
         edit: false,
@@ -182,7 +203,8 @@ export default {
         createAndInvite: false,
         edit: false,
         del: false,
-        invite: false
+        invite: false,
+        savingSearch: false
       },
       modals: {
         edit: false,
@@ -196,6 +218,7 @@ export default {
       personToDelete: {},
       personToEdit: { role: 'user' },
       personToChangePassword: {},
+      selectedDepartment: '',
       success: {
         invite: false
       }
@@ -203,6 +226,8 @@ export default {
   },
 
   mounted() {
+    this.role = this.$route.query.role || 'all'
+    this.selectedDepartment = this.$route.query.department || ''
     this.loadPeople(() => {
       this.setSearchFromUrl()
       this.onSearchChange()
@@ -220,6 +245,14 @@ export default {
         this.loading.invite = false
         this.success.invite = false
       }
+    },
+
+    selectedDepartment() {
+      this.updateRoute()
+    },
+
+    role() {
+      this.updateRoute()
     }
   },
 
@@ -239,14 +272,22 @@ export default {
       'personCsvFormData'
     ]),
 
-    deleteText() {
-      const person = this.personToDelete
-      if (person !== undefined) {
-        const personName = `${person.first_name} ${person.last_name}`
-        return this.$t('people.delete_text', { personName })
-      } else {
-        return ''
+    currentPeople() {
+      let people =
+        this.role === 'all'
+          ? this.displayedPeople
+          : this.displayedPeople.filter(p => p.role === this.role)
+      if (this.selectedDepartment) {
+        people = people.filter(p =>
+          p.departments.includes(this.selectedDepartment)
+        )
       }
+      return people
+    },
+
+    deleteText() {
+      const personName = this.personToDelete?.full_name
+      return personName ? this.$t('people.delete_text', { personName }) : ''
     },
 
     filteredPeople() {
@@ -296,7 +337,8 @@ export default {
     uploadImportFile(data, toUpdate) {
       const formData = new FormData()
       const filename = 'import.csv'
-      const file = new File([data.join('\n')], filename, { type: 'text/csv' })
+      const csvContent = csv.turnEntriesToCsvString(data)
+      const file = new File([csvContent], filename, { type: 'text/csv' })
 
       formData.append('file', file)
       this.loading.importing = true
@@ -412,7 +454,7 @@ export default {
       const searchQuery = this.searchField.getValue()
       if (searchQuery.length !== 1) {
         this.setPeopleSearch(searchQuery)
-        this.setSearchInUrl()
+        this.updateRoute()
       }
     },
 
@@ -457,7 +499,15 @@ export default {
     },
 
     saveSearchQuery(searchQuery) {
-      this.savePeopleSearch(searchQuery).catch(console.error)
+      if (this.loading.savingSearch) {
+        return
+      }
+      this.loading.savingSearch = true
+      this.savePeopleSearch(searchQuery)
+        .catch(console.error)
+        .finally(() => {
+          this.loading.savingSearch = false
+        })
     },
 
     removeSearchQuery(searchQuery) {
@@ -468,6 +518,13 @@ export default {
       this.modals.isBuildFilterDisplayed = false
       this.searchField.setValue(query)
       this.onSearchChange()
+    },
+
+    updateRoute() {
+      const search = this.searchField.getValue()
+      const department = this.selectedDepartment
+      const role = this.role
+      this.$router.push({ query: { search, department, role } })
     }
   },
 
@@ -487,7 +544,7 @@ export default {
   margin-top: 1.5rem;
 }
 .search-options {
-  align-items: flex-start;
+  align-items: flex-end;
 }
 .filter-button {
   margin-top: 0.3em;

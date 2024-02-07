@@ -1,4 +1,3 @@
-import Vue from 'vue/dist/vue'
 import peopleApi from '@/store/api/people'
 import peopleStore from '@/store/modules/people'
 import taskStatusStore from '@/store/modules/taskstatus'
@@ -43,6 +42,9 @@ import {
   LOAD_USER_FILTERS_END,
   LOAD_USER_FILTERS_ERROR,
   UPDATE_USER_FILTER,
+  LOAD_USER_FILTER_GROUPS_END,
+  LOAD_USER_FILTER_GROUPS_ERROR,
+  UPDATE_USER_FILTER_GROUP,
   SAVE_TODO_SEARCH_END,
   REMOVE_TODO_SEARCH_END,
   ADD_SELECTED_TASK,
@@ -59,6 +61,7 @@ import {
   SAVE_SHOT_SEARCH_END,
   REMOVE_ASSET_SEARCH_END,
   LOAD_PRODUCTION_STATUS_END,
+  LOAD_BACKGROUNDS_END,
   LOAD_DEPARTMENTS_END,
   LOAD_TASK_STATUSES_END,
   LOAD_TASK_TYPES_END,
@@ -105,9 +108,11 @@ const initialState = {
   displayedTodos: [],
   displayedDoneTasks: [],
   todosSearchText: '',
+  doneSelectionGrid: {},
   todoSelectionGrid: {},
   todoSearchQueries: [],
   userFilters: {},
+  userFilterGroups: {},
   todoListScrollPosition: 0,
 
   timeSpentMap: {},
@@ -138,10 +143,12 @@ const getters = {
 
   displayedTodos: state => state.displayedTodos,
   displayedDoneTasks: state => state.displayedDoneTasks,
+  doneSelectionGrid: state => state.doneSelectionGrid,
   todosSearchText: state => state.todosSearchText,
   todoSelectionGrid: state => state.todoSelectionGrid,
   todoSearchQueries: state => state.todoSearchQueries,
   userFilters: state => state.userFilters,
+  userFilterGroups: state => state.userFilterGroups,
   isTodosLoading: state => state.isTodosLoading,
   isTodosLoadingError: state => state.isTodosLoadingError,
   todoListScrollPosition: state => state.todoListScrollPosition,
@@ -290,7 +297,7 @@ const actions = {
               .then(timeSpents => {
                 commit(USER_LOAD_TIME_SPENTS_END, timeSpents)
                 commit(USER_LOAD_TODOS_END, { tasks, userFilters, taskTypeMap })
-                commit(REGISTER_USER_TASKS, { tasks })
+                commit(REGISTER_USER_TASKS, { tasks: tasks.concat(doneTasks) })
                 return peopleApi.getDayOff(state.user.id, date)
               })
               .then(dayOff => {
@@ -316,25 +323,28 @@ const actions = {
     })
   },
 
-  uploadAvatar({ commit, state }, callback) {
-    peopleApi.postAvatar(state.user.id, state.avatarFormData, err => {
-      if (!err) commit(UPLOAD_AVATAR_END, state.user.id)
-      if (callback) callback(err)
-    })
+  async uploadAvatar({ commit, state }) {
+    await peopleApi.postAvatar(state.user.id, state.avatarFormData)
+    commit(UPLOAD_AVATAR_END, state.user.id)
   },
 
-  clearAvatar({ commit, state }) {
-    commit(CLEAR_AVATAR)
-    return peopleApi.clearAvatar()
+  async clearAvatar({ commit, state }) {
+    await peopleApi.clearAvatar()
+    commit(CLEAR_AVATAR, state.user.id)
   },
 
   setTodosSearch({ commit, state }, searchText) {
     commit(SET_TODOS_SEARCH, searchText)
   },
 
-  updateSearchFilter({ commit }, searchFilter) {
+  async updateSearchFilterGroup({ commit }, searchFilterGroup) {
+    await peopleApi.updateFilterGroup(searchFilterGroup)
+    commit(UPDATE_USER_FILTER_GROUP, searchFilterGroup)
+  },
+
+  async updateSearchFilter({ commit }, searchFilter) {
+    await peopleApi.updateFilter(searchFilter)
     commit(UPDATE_USER_FILTER, searchFilter)
-    return peopleApi.updateFilter(searchFilter)
   },
 
   loadUserSearchFilters({ commit }, callback) {
@@ -343,29 +353,30 @@ const actions = {
       else commit(LOAD_USER_FILTERS_END, searchFilters)
       callback(err)
     })
+    // return peopleApi.getUserSearchFilters()
+    // .then((searchFilters) => {
+    //   commit(LOAD_USER_FILTERS_END, searchFilters);
+    // })
+    // .catch((err) => {
+    //   commit(LOAD_USER_FILTERS_ERROR);
+    // })
   },
 
   saveTodoSearch({ commit, rootGetters }, searchQuery) {
-    const query = state.todoSearchQueries.find(
-      query => query.name === searchQuery
-    )
-
-    if (!query) {
-      return peopleApi
-        .createFilter('todos', searchQuery, searchQuery, null, null)
-        .then(searchQuery => {
-          commit(SAVE_TODO_SEARCH_END, { searchQuery })
-          return Promise.resolve(searchQuery)
-        })
-    } else {
-      return Promise.resolve()
+    if (state.todoSearchQueries.some(query => query.name === searchQuery)) {
+      return
     }
+    return peopleApi
+      .createFilter('todos', searchQuery, searchQuery, null, null)
+      .then(searchQuery => {
+        commit(SAVE_TODO_SEARCH_END, { searchQuery })
+        return searchQuery
+      })
   },
 
-  removeTodoSearch({ commit, rootGetters }, searchQuery) {
+  removeTodoSearch({ commit }, searchQuery) {
     return peopleApi.removeFilter(searchQuery).then(() => {
       commit(REMOVE_TODO_SEARCH_END, { searchQuery })
-      return Promise.resolve(searchQuery)
     })
   },
 
@@ -373,11 +384,13 @@ const actions = {
     commit(SET_TODO_LIST_SCROLL_POSITION, scrollPosition)
   },
 
-  loadContext({ commit, rootGetters }, callback) {
+  loadContext({ commit, rootGetters }) {
     return peopleApi.getContext().then(context => {
       commit(LOAD_USER_FILTERS_END, context.search_filters)
+      commit(LOAD_USER_FILTER_GROUPS_END, context.search_filter_groups)
       commit(LOAD_PRODUCTION_STATUS_END, context.project_status)
       commit(LOAD_DEPARTMENTS_END, context.departments)
+      commit(LOAD_BACKGROUNDS_END, context.preview_background_files)
       commit(LOAD_TASK_STATUSES_END, context.task_status)
       commit(LOAD_PEOPLE_END, {
         people: context.persons,
@@ -402,11 +415,11 @@ const mutations = {
     state.user = peopleStore.helpers.addAdditionalInformation(user)
     state.isAuthenticated = true
   },
-  [USER_LOGOUT](state, user) {
+  [USER_LOGOUT](state) {
     state.user = null
     state.isAuthenticated = false
   },
-  [USER_LOGIN_FAIL](state, user) {
+  [USER_LOGIN_FAIL](state) {
     state.user = null
     state.isAuthenticated = false
   },
@@ -578,6 +591,7 @@ const mutations = {
       const taskStatus = helpers.getTaskStatus(task.task_status_id)
       task.taskStatus = taskStatus
     })
+    state.doneSelectionGrid = buildSelectionGrid(tasks.length, 1)
     cache.doneIndex = buildTaskIndex(tasks)
     cache.doneTasks = tasks
     state.displayedDoneTasks = tasks
@@ -593,10 +607,9 @@ const mutations = {
 
   [UPLOAD_AVATAR_END](state) {
     if (state.user) {
-      const randomHash = Math.random().toString(36).substring(7)
+      const timestamp = Date.now()
+      state.user.avatarPath = `/api/pictures/thumbnails/persons/${state.user.id}.png?t=${timestamp}`
       state.user.has_avatar = true
-      Vue.set(state.user, 'uniqueHash', randomHash)
-      state.user.avatarPath = `/api/pictures/thumbnails/persons/${state.user.id}.png`
     }
   },
 
@@ -644,19 +657,38 @@ const mutations = {
   },
 
   [ADD_SELECTED_TASK](state, validationInfo) {
-    if (state.todoSelectionGrid && state.todoSelectionGrid[validationInfo.x]) {
+    if (
+      validationInfo.done &&
+      state.doneSelectionGrid &&
+      state.doneSelectionGrid[validationInfo.x]
+    ) {
+      state.doneSelectionGrid[validationInfo.x][validationInfo.y] = true
+    } else if (
+      state.todoSelectionGrid &&
+      state.todoSelectionGrid[validationInfo.x]
+    ) {
       state.todoSelectionGrid[validationInfo.x][validationInfo.y] = true
     }
   },
 
   [REMOVE_SELECTED_TASK](state, validationInfo) {
-    if (state.todoSelectionGrid && state.todoSelectionGrid[validationInfo.x]) {
+    if (
+      validationInfo.done &&
+      state.doneSelectionGrid &&
+      state.doneSelectionGrid[validationInfo.x]
+    ) {
+      state.doneSelectionGrid[validationInfo.x][validationInfo.y] = false
+    } else if (
+      state.todoSelectionGrid &&
+      state.todoSelectionGrid[validationInfo.x]
+    ) {
       state.todoSelectionGrid[validationInfo.x][validationInfo.y] = false
     }
   },
 
   [CLEAR_SELECTED_TASKS](state) {
     state.todoSelectionGrid = clearSelectionGrid(state.todoSelectionGrid)
+    state.doneSelectionGrid = clearSelectionGrid(state.doneSelectionGrid)
   },
 
   [SET_TODO_LIST_SCROLL_POSITION](state, scrollPosition) {
@@ -674,6 +706,24 @@ const mutations = {
         const filter = projectFilters.find(f => f.id === userFilter.id)
         if (filter) {
           Object.assign(filter, userFilter)
+        }
+      })
+    })
+  },
+
+  [LOAD_USER_FILTER_GROUPS_ERROR](state) {},
+  [LOAD_USER_FILTER_GROUPS_END](state, userFilterGroups) {
+    state.userFilterGroups = userFilterGroups
+  },
+  [UPDATE_USER_FILTER_GROUP](state, userFilterGroup) {
+    Object.keys(state.userFilterGroups).forEach(typeName => {
+      Object.keys(state.userFilterGroups[typeName]).forEach(projectId => {
+        const projectFilterGroups = state.userFilterGroups[typeName][projectId]
+        const filterGroup = projectFilterGroups.find(
+          f => f.id === userFilterGroup.id
+        )
+        if (filterGroup) {
+          Object.assign(filterGroup, userFilterGroup)
         }
       })
     })

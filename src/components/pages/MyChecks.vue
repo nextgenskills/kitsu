@@ -13,11 +13,11 @@
 
           <combobox
             class="flexrow-item"
-            :label="$t('main.episode')"
+            :label="$t('shots.fields.episode')"
             :options="episodeOptions"
             v-model="episodeId"
             v-show="productionId"
-            v-if="taskStatusList.length > 0"
+            v-if="episodeOptions.length > 0"
           />
 
           <combobox-task-type
@@ -60,14 +60,14 @@
         </div>
 
         <div class="flexrow">
-          <h1 class="title mt1 flerow-item">
-            {{ nbTasksToCheck }} tasks to check
+          <h1 class="title mt1 flexrow-item filler">
+            {{ nbTasksToCheck }}
+            {{ $tc('my_checks.title', nbTasksToCheck) }}
           </h1>
-          <div class="filler"></div>
-          <ButtonSimple
+          <button-simple
             class="flexrow-item"
             @click="isPlaylist = true"
-            text="Build playlist from list"
+            :text="$t('tasks.build_playlist')"
           />
         </div>
 
@@ -102,7 +102,7 @@ import moment from 'moment-timezone'
 import firstBy from 'thenby'
 
 import { populateTask } from '@/lib/models'
-import { sortByName } from '@/lib/sorting'
+import { sortByName, sortPeople } from '@/lib/sorting'
 import { buildSelectionGrid } from '@/lib/selection'
 import { parseDate } from '@/lib/time'
 
@@ -117,7 +117,7 @@ import TodosList from '@/components/lists/TodosList'
 import ViewPlaylistModal from '@/components/modals/ViewPlaylistModal'
 
 export default {
-  name: 'todos',
+  name: 'my-checks',
 
   components: {
     ButtonSimple,
@@ -181,16 +181,14 @@ export default {
       })
   },
 
-  afterDestroy() {},
-
   computed: {
     ...mapGetters([
       'nbSelectedTasks',
       'personMap',
       'productionMap',
+      'selectedTasks',
       'taskStatusMap',
-      'taskTypeMap',
-      'selectedTasks'
+      'taskTypeMap'
     ]),
 
     nbTasksToCheck() {
@@ -210,7 +208,7 @@ export default {
           }
         })
       })
-      return assignees
+      return sortPeople(assignees)
     },
 
     episodeOptions() {

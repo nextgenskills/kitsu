@@ -21,52 +21,57 @@ import TaskType from '@/components/pages/TaskType'
 import Todos from '@/components/pages/Todos'
 import Edits from '@/components/pages/Edits'
 
-import AssetTypes from '@/components/pages/AssetTypes'
 import Asset from '@/components/pages/Asset'
+import AssetTypes from '@/components/pages/AssetTypes'
+import Backgrounds from '@/components/pages/Backgrounds'
 import Breakdown from '@/components/pages/Breakdown'
+import Concepts from '@/components/pages/Concepts'
 import CustomActions from '@/components/pages/CustomActions'
-import StatusAutomations from '@/components/pages/StatusAutomations'
+import Departments from '@/components/pages/departments/Departments'
+import Edit from '@/components/pages/Edit'
 import Episodes from '@/components/pages/Episodes'
+import Logs from '@/components/pages/Logs'
 import MainSchedule from '@/components/pages/MainSchedule'
 import NotFound from '@/components/pages/NotFound'
-import Person from '@/components/pages/Person'
 import People from '@/components/pages/People'
+import Person from '@/components/pages/Person'
 import Playlist from '@/components/pages/Playlist'
 import Productions from '@/components/pages/Productions'
 import ProductionAssetTypes from '@/components/pages/ProductionAssetTypes'
-import ProductionSchedule from '@/components/pages/ProductionSchedule'
 import ProductionQuota from '@/components/pages/ProductionQuota'
+import ProductionSchedule from '@/components/pages/ProductionSchedule'
 import ProductionSettings from '@/components/pages/ProductionSettings'
 import Profile from '@/components/pages/Profile'
 import ResetPassword from '@/components/pages/ResetPassword'
 import ResetChangePassword from '@/components/pages/ResetChangePassword'
-import Logs from '@/components/pages/Logs'
 import ServerDown from '@/components/pages/ServerDown'
 import Settings from '@/components/pages/Settings'
 import Sequences from '@/components/pages/Sequences'
 import Shot from '@/components/pages/Shot'
+import StatusAutomations from '@/components/pages/StatusAutomations'
 import Task from '@/components/pages/Task'
 import Team from '@/components/pages/Team'
+import TeamSchedule from '@/components/pages/TeamSchedule'
 import Timesheets from '@/components/pages/Timesheets'
 import TaskStatus from '@/components/pages/TaskStatus'
 import TaskTypes from '@/components/pages/TaskTypes'
-import Departements from '@/components/pages/departments/Departments'
 import WrongBrowser from '@/components/pages/WrongBrowser'
-import Edit from '@/components/pages/Edit'
 
 const ADMIN_PAGES = [
   'asset-types',
+  'backgrounds',
   'custom-actions',
-  'status-automations',
   'departments',
   'logs',
   'main-schedule',
   'people',
+  'newsfeed',
   'productions',
   'task-status',
   'task-types',
-  'main-schedule',
-  'settings'
+  'team-schedule',
+  'settings',
+  'status-automations'
 ]
 
 export const routes = [
@@ -77,12 +82,13 @@ export const routes = [
     beforeEnter: (to, from, next) => {
       const browser = Bowser.getParser(window.navigator.userAgent)
       const isValidBrowser = browser.satisfies({
-        chrome: '>20.1.1432',
-        firefox: '>31',
+        // see https://vitejs.dev/guide/build.html#browser-compatibility
+        chrome: '>=87',
+        firefox: '>=78',
         edge: '>90',
         vivaldi: '>2.8',
         opera: '>22',
-        safari: '>9'
+        safari: '>=14'
       })
       if (!isValidBrowser) {
         return next({ name: 'wrong-browser' })
@@ -181,8 +187,14 @@ export const routes = [
       },
 
       {
+        path: 'backgrounds',
+        component: Backgrounds,
+        name: 'backgrounds'
+      },
+
+      {
         path: 'departments',
-        component: Departements,
+        component: Departments,
         name: 'departments'
       },
 
@@ -286,6 +298,12 @@ export const routes = [
         path: '/main-schedule',
         component: MainSchedule,
         name: 'main-schedule'
+      },
+
+      {
+        path: '/team-schedule',
+        component: TeamSchedule,
+        name: 'team-schedule'
       },
 
       {
@@ -572,6 +590,12 @@ export const routes = [
             name: 'breakdown-asset-type'
           }
         ]
+      },
+
+      {
+        path: 'productions/:production_id/concepts',
+        component: Concepts,
+        name: 'concepts'
       },
 
       {

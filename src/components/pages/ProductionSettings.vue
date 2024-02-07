@@ -3,19 +3,24 @@
     <div class="wrapper">
       <div class="tabs">
         <ul>
-          <li :class="{ 'is-active': isActiveTab('brief') }">
-            <a @click="activeTab = 'brief'">
-              {{ $t('productions.brief.title') }}
-            </a>
-          </li>
           <li :class="{ 'is-active': isActiveTab('parameters') }">
             <a @click="activeTab = 'parameters'">
               {{ $t('productions.parameters.title') }}
             </a>
           </li>
+          <li :class="{ 'is-active': isActiveTab('brief') }">
+            <a @click="activeTab = 'brief'">
+              {{ $t('productions.brief.title') }}
+            </a>
+          </li>
           <li :class="{ 'is-active': isActiveTab('taskStatus') }">
             <a @click="activeTab = 'taskStatus'">
               {{ $t('task_status.title') }}
+            </a>
+          </li>
+          <li :class="{ 'is-active': isActiveTab('board') }">
+            <a @click="activeTab = 'board'">
+              {{ $t('board.settings.title') }}
             </a>
           </li>
           <li :class="{ 'is-active': isActiveTab('taskTypes') }">
@@ -33,15 +38,20 @@
               {{ $t('status_automations.title') }}
             </a>
           </li>
+          <li :class="{ 'is-active': isActiveTab('backgrounds') }">
+            <a @click="activeTab = 'backgrounds'">
+              {{ $t('backgrounds.title') }}
+            </a>
+          </li>
         </ul>
-      </div>
-
-      <div class="tab" v-show="isActiveTab('brief')">
-        <ProductionBrief />
       </div>
 
       <div class="tab" v-show="isActiveTab('parameters')">
         <production-parameters />
+      </div>
+
+      <div class="tab" v-show="isActiveTab('brief')">
+        <production-brief />
       </div>
 
       <div class="tab" v-show="isActiveTab('assetTypes')">
@@ -114,9 +124,19 @@
               </th>
             </tr>
           </thead>
-          <tbody class="datatable-body">
-            <template v-for="taskStatus in productionTaskStatuses">
-              <tr class="datatable-row" :key="taskStatus.id" v-if="taskStatus">
+          <draggable
+            class="datatable-body"
+            draggable=".task-status"
+            tag="tbody"
+            :value="sortedProductionTaskStatuses"
+            @end="updateTaskStatusPriority($event.oldIndex, $event.newIndex)"
+          >
+            <template v-for="taskStatus in sortedProductionTaskStatuses">
+              <tr
+                class="datatable-row task-status"
+                :key="taskStatus.id"
+                v-if="taskStatus"
+              >
                 <td>
                   {{ taskStatus.name }}
                 </td>
@@ -140,27 +160,40 @@
                 </td>
               </tr>
             </template>
-          </tbody>
+          </draggable>
         </table>
+      </div>
+
+      <div class="tab" v-show="isActiveTab('board')">
+        <production-board />
       </div>
 
       <div class="tab" v-show="isActiveTab('statusAutomations')">
         <production-status-automations />
+      </div>
+
+      <div class="tab" v-show="isActiveTab('backgrounds')">
+        <production-backgrounds />
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import draggable from 'vuedraggable'
 import { mapGetters, mapActions } from 'vuex'
+
+import { sortTaskStatuses } from '@/lib/sorting'
 
 import BooleanCell from '@/components/cells/BooleanCell'
 import Combobox from '@/components/widgets/Combobox'
 import ComboboxStatus from '@/components/widgets/ComboboxStatus'
+import ProductionBackgrounds from '@/components/pages/production/ProductionBackgrounds'
+import ProductionBoard from '@/components/pages/production/ProductionBoard'
 import ProductionBrief from '@/components/pages/production/ProductionBrief'
 import ProductionParameters from '@/components/pages/production/ProductionParameters'
-import ProductionTaskTypes from '@/components/pages/production/ProductionTaskTypes'
 import ProductionStatusAutomations from '@/components/pages/production/ProductionStatusAutomations'
+import ProductionTaskTypes from '@/components/pages/production/ProductionTaskTypes'
 import ValidationTag from '@/components/widgets/ValidationTag'
 
 export default {
@@ -169,16 +202,19 @@ export default {
     BooleanCell,
     Combobox,
     ComboboxStatus,
+    draggable,
+    ProductionBackgrounds,
+    ProductionBoard,
     ProductionBrief,
     ProductionParameters,
-    ProductionTaskTypes,
     ProductionStatusAutomations,
+    ProductionTaskTypes,
     ValidationTag
   },
 
   data() {
     return {
-      activeTab: 'brief',
+      activeTab: 'parameters',
       assetTypeId: '',
       taskStatusId: ''
     }
@@ -220,7 +256,16 @@ export default {
 
     remainingTaskStatuses() {
       return this.taskStatus.filter(
-        s => !this.currentProduction.task_statuses.includes(s.id)
+        status =>
+          !this.currentProduction.task_statuses.includes(status.id) &&
+          !status.for_concept
+      )
+    },
+
+    sortedProductionTaskStatuses() {
+      return sortTaskStatuses(
+        this.productionTaskStatuses,
+        this.currentProduction
       )
     }
   },
@@ -229,6 +274,8 @@ export default {
     ...mapActions([
       'addAssetTypeToProduction',
       'addTaskStatusToProduction',
+      'editTaskStatusLink',
+      'loadContext',
       'removeAssetTypeFromProduction',
       'removeTaskStatusFromProduction'
     ]),
@@ -273,6 +320,27 @@ export default {
 
     getBooleanTranslation(bool) {
       return bool ? this.$t('main.yes') : this.$t('main.no')
+    },
+
+    async updateTaskStatusPriority(oldIndex, newIndex) {
+      const taskStatuses = [...this.productionTaskStatuses]
+      const taskStatus = taskStatuses[oldIndex]
+      taskStatuses.splice(oldIndex, 1)
+      taskStatuses.splice(newIndex, 0, taskStatus)
+      await this.updateTaskStatusPriorities(taskStatuses)
+    },
+
+    async updateTaskStatusPriorities(taskStatuses) {
+      const taskStatusLinks = taskStatuses.map((taskStatus, index) => ({
+        ...this.currentProduction.task_statuses_link[taskStatus.id],
+        priority: index + 1,
+        project_id: this.currentProduction.id,
+        task_status_id: taskStatus.id
+      }))
+      for (const taskStatusLink of taskStatusLinks) {
+        await this.editTaskStatusLink(taskStatusLink)
+      }
+      await this.loadContext()
     }
   },
 
@@ -376,5 +444,13 @@ th {
 
 .box {
   max-width: 400px;
+}
+
+.task-status {
+  cursor: grab;
+}
+
+.task-status[draggable='true'] {
+  cursor: grabbing;
 }
 </style>

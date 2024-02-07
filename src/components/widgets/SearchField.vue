@@ -1,5 +1,5 @@
 <template>
-  <div class="flexrow search-field-wrapper" ref="wrapper" @click="focus">
+  <div class="flexrow search-field-wrapper" :class="{ focused }" @click="focus">
     <div class="flexrow-item">
       <search-icon class="search-icon" />
     </div>
@@ -12,9 +12,10 @@
         :placeholder="placeholder"
         @input="onSearchChange"
         @keyup.enter="onEnterPressed"
-        @focus="setFocusedStyle"
-        @blur="unsetFocusedStyle"
-        v-focus
+        @focus="focused = true"
+        @blur="focused = false"
+        v-model.trim="search"
+        v-focus="focusOptions"
       />
     </div>
 
@@ -37,7 +38,10 @@ export default {
   name: 'search-field',
 
   data() {
-    return {}
+    return {
+      search: '',
+      focused: false
+    }
   },
 
   props: {
@@ -49,9 +53,13 @@ export default {
       type: Boolean,
       default: false
     },
+    // FIXME:property no longer used in component
     active: {
       type: Boolean,
       default: true
+    },
+    focusOptions: {
+      type: Object
     }
   },
 
@@ -60,53 +68,36 @@ export default {
     SearchIcon
   },
 
-  computed: {},
-
   methods: {
     onSearchChange() {
-      this.$emit('change', this.$refs.input.value)
+      this.$emit('change', this.search)
     },
 
     onEnterPressed() {
-      this.$emit('enter', this.$refs.input.value)
+      this.$emit('enter', this.search)
     },
 
     onSaveClicked() {
-      const value = this.$refs.input.value.trim()
-      if (value.length > 0) {
-        if (this.canSave) this.$emit('save', value)
+      if (this.search && this.canSave) {
+        this.$emit('save', this.search)
       }
     },
 
-    getValue(value) {
-      if (this.$refs.input) {
-        return this.$refs.input.value
-      } else {
-        return ''
-      }
+    getValue() {
+      return this.search
     },
 
     setValue(value) {
-      this.$refs.input.value = value
+      this.search = value
     },
 
-    focus() {
-      if (this.$refs.input) {
-        this.$refs.input.focus()
-      }
+    focus(options) {
+      this.$refs.input?.focus(options)
     },
 
     clearSearch() {
-      this.setValue('')
+      this.search = ''
       this.onSearchChange()
-    },
-
-    setFocusedStyle() {
-      this.$refs.wrapper.className = 'flexrow search-field-wrapper focused'
-    },
-
-    unsetFocusedStyle() {
-      this.$refs.wrapper.className = 'flexrow search-field-wrapper'
     }
   }
 }
@@ -122,7 +113,7 @@ export default {
     border: 1px solid #666;
 
     &.focused {
-      box-shadow: 0 0 4px 3px #222;
+      box-shadow: 0 0 4px 3px #444;
     }
   }
 
@@ -139,15 +130,18 @@ export default {
 
 .search-field {
   margin-right: 0.2em;
+  width: 100%;
 }
 
 .search-input {
-  width: 300px;
+  width: 100%;
   background: inherit;
   color: var(--text);
 }
 
 .search-icon {
+  width: 20px;
+  margin-top: 5px;
   color: var(--text);
 }
 
@@ -175,11 +169,15 @@ export default {
 }
 
 .search-field-wrapper {
+  max-width: 420px;
+  width: 100%;
   border: 1px solid #ddd;
   border-radius: 2em;
   padding: 0.2em 1em;
   margin-right: 1em;
-  transition: border 0.5s ease-in-out, box-shadow 0.5s ease-in-out;
+  transition:
+    border 0.5s ease-in-out,
+    box-shadow 0.5s ease-in-out;
 
   &.focused {
     border: 1px solid $green;
@@ -190,11 +188,6 @@ export default {
 .search-field-wrapper:focus,
 .search-field-wrapper:hover {
   border-color: $green;
-}
-
-.search-icon {
-  width: 20px;
-  margin-top: 5px;
 }
 
 @media screen and (max-width: 768px) {

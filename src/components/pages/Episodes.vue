@@ -9,7 +9,6 @@
               :can-save="true"
               :active="isSearchActive"
               @change="onSearchChange"
-              @enter="saveSearchQuery"
               @save="saveSearchQuery"
               placeholder="ex: e01 episode=wip"
             />
@@ -38,6 +37,7 @@
           <div class="query-list mt1">
             <search-query-list
               :queries="episodeSearchQueries"
+              type="episode"
               @change-search="changeSearch"
               @remove-search="removeSearchQuery"
               v-if="!isEpisodesLoading && !initialLoading"
@@ -148,12 +148,14 @@
 
     <add-thumbnails-modal
       ref="add-thumbnails-modal"
+      entity-type="Episode"
       parent="episodes"
       :active="modals.isAddThumbnailsDisplayed"
       :is-loading="loading.addThumbnails"
       :is-error="errors.addThumbnails"
       @cancel="hideAddThumbnailsModal"
       @confirm="confirmAddThumbnails"
+      v-if="false"
     />
 
     <build-filter-modal
@@ -246,9 +248,9 @@ export default {
       episodeToEdit: null,
       formData: null,
       genericColumns: [
-        'metadata_column_name => text value',
-        'task_type_name => task_status_name',
-        'task_type_name comment => comment text'
+        'Metadata column name (text value)',
+        'Task type name (task status name value)',
+        'Task type name + comment (text value)'
       ],
       historyEdit: {},
       initialLoading: true,
@@ -281,6 +283,7 @@ export default {
         edit: false,
         episode: false,
         importing: false,
+        savingSearch: false,
         stay: false
       },
       errors: {
@@ -309,7 +312,7 @@ export default {
       this.searchField.setValue(this.episodeSearchText)
     }
     if (this.$route.query.search && this.$route.query.search.length > 0) {
-      searchQuery = '' + this.$route.query.search
+      searchQuery = `${this.$route.query.search}`
     }
     if (searchQuery === 'undefined') searchQuery = ''
     this.$refs['episode-list'].setScrollPosition(this.episodeListScrollPosition)
@@ -383,11 +386,11 @@ export default {
     ]),
 
     renderColumns() {
-      var collection = [...this.dataMatchers, ...this.optionalColumns]
+      const collection = [...this.dataMatchers, ...this.optionalColumns]
 
       this.productionEpisodeTaskTypes.forEach(item => {
         collection.push(item.name)
-        collection.push(item.name + ' comment')
+        collection.push(`${item.name} comment`)
       })
       return collection
     },
@@ -498,7 +501,15 @@ export default {
     },
 
     saveSearchQuery(searchQuery) {
-      this.saveEpisodeSearch(searchQuery).catch(console.error)
+      if (this.loading.savingSearch) {
+        return
+      }
+      this.loading.savingSearch = true
+      this.saveEpisodeSearch(searchQuery)
+        .catch(console.error)
+        .finally(() => {
+          this.loading.savingSearch = false
+        })
     },
 
     removeSearchQuery(searchQuery) {
@@ -602,9 +613,8 @@ export default {
       const episode = this.episodeToDelete
       if (episode) {
         return this.$t('episodes.delete_text', { name: episode.name })
-      } else {
-        return ''
       }
+      return ''
     }
   },
 
@@ -630,7 +640,7 @@ export default {
       if (!this.isEpisodesLoading) {
         let searchQuery = ''
         if (this.$route.query.search && this.$route.query.search.length > 0) {
-          searchQuery = '' + this.$route.query.search
+          searchQuery = `${this.$route.query.search}`
         }
         this.initialLoading = false
         this.$refs['episode-search-field'].setValue(searchQuery)

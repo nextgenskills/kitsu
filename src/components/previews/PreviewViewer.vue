@@ -1,18 +1,24 @@
 <template>
-  <div ref="container" class="preview-viewer dark">
+  <div
+    ref="container"
+    class="preview-viewer dark"
+    :style="{
+      maxHeight: isFullScreen ? `calc(100vh - ${marginBottom}px)` : null
+    }"
+  >
     <div
       class="center status-message"
       :style="{ height: defaultHeight + 'px' }"
-      v-show="isBroken"
+      v-if="isBroken"
     >
-      <p>This preview is broken.</p>
+      <p>{{ $t('preview.broken') }}</p>
     </div>
 
     <div
       class="center status-message"
       :style="{ height: defaultHeight + 'px' }"
-      title="Video processing in progress..."
-      v-show="isProcessing"
+      :title="$t('preview.processing')"
+      v-if="isProcessing"
     >
       <spinner :is-processing="true" />
     </div>
@@ -21,51 +27,61 @@
       ref="video-viewer"
       class="video-viewer"
       :name="name"
-      :big="big"
+      :big="isBig"
       :default-height="defaultHeight"
+      :full-screen="isFullScreen"
       :is-comparing="isComparing"
+      :is-comparison-overlay="isComparisonOverlay"
       :is-hd="isHd"
       :is-muted="isMuted"
       :is-repeating="isRepeating"
-      :light="light"
+      :light="isLight"
+      :current-frame="currentFrame"
+      :nb-frames="nbFrames"
+      :panzoom="true"
       :preview="preview"
-      :full-screen="fullScreen"
-      @size-changed="dimensions => $emit('size-changed', dimensions)"
-      @video-loaded="$emit('video-loaded')"
       @duration-changed="duration => $emit('duration-changed', duration)"
       @frame-update="frameNumber => $emit('frame-update', frameNumber)"
       @play-ended="$emit('play-ended')"
+      @size-changed="onVideoSizeChanged"
       @video-end="$emit('video-end')"
+      @video-loaded="$emit('video-loaded')"
       v-show="isMovie"
     />
 
     <picture-viewer
       ref="picture-viewer"
-      :big="big"
+      :big="isBig"
       :default-height="defaultHeight"
-      :full-screen="fullScreen"
+      :full-screen="isFullScreen"
       :is-comparing="isComparing"
-      :light="light"
+      :is-comparison-overlay="isComparisonOverlay"
+      :light="isLight"
+      :margin-bottom="marginBottom"
+      :panzoom="true"
       :preview="preview"
-      @size-changed="dimensions => $emit('size-changed', dimensions)"
+      @size-changed="onPictureSizeChanged"
       v-show="isPicture"
     />
 
     <object-viewer
       class="model-viewer"
+      :background-url="backgroundUrl"
       :default-height="defaultHeight"
-      :preview-url="originalPath"
-      :light="light"
       :empty="!is3DModel"
-      :full-screen="fullScreen"
+      :full-screen="isFullScreen"
+      :is-environment-skybox="isEnvironmentSkybox"
+      :is-wireframe="isWireframe"
+      :light="isLight"
+      :preview-url="originalPath"
       v-if="is3DModel"
     />
 
     <sound-viewer
       ref="sound-viewer"
       class="sound-viewer"
-      :preview-url="isSound ? originalPath : ''"
       :file-name="fileTitle"
+      :preview-url="isSound ? originalPath : ''"
       @play-ended="$emit('play-ended')"
       v-show="isSound"
     />
@@ -77,11 +93,7 @@
       v-if="isPdf"
     /-->
 
-    <div
-      class="center"
-      :style="{ height: defaultHeight + 'px' }"
-      v-show="isFile"
-    >
+    <div class="center" :style="{ height: defaultHeight + 'px' }" v-if="isFile">
       <a
         class="button mt2"
         ref="preview-file"
@@ -130,15 +142,35 @@ export default {
       type: String,
       default: ''
     },
-    big: {
-      type: Boolean,
-      default: false
-    },
     defaultHeight: {
       type: Number,
       default: 0
     },
+    currentFrame: {
+      type: Number,
+      default: 0
+    },
+    marginBottom: {
+      type: Number,
+      default: 0
+    },
+    nbFrames: {
+      type: Number,
+      default: 0
+    },
+    isBig: {
+      type: Boolean,
+      default: false
+    },
     isComparing: {
+      type: Boolean,
+      default: false
+    },
+    isEnvironmentSkybox: {
+      type: Boolean,
+      default: false
+    },
+    isFullScreen: {
       type: Boolean,
       default: false
     },
@@ -146,7 +178,11 @@ export default {
       type: Boolean,
       default: false
     },
-    fullScreen: {
+    isComparisonOverlay: {
+      type: Boolean,
+      default: false
+    },
+    isLight: {
       type: Boolean,
       default: false
     },
@@ -154,13 +190,21 @@ export default {
       type: Boolean,
       default: false
     },
+    isObjectBackground: {
+      type: Boolean,
+      default: false
+    },
     isRepeating: {
       type: Boolean,
       default: false
     },
-    light: {
+    isWireframe: {
       type: Boolean,
       default: false
+    },
+    objectBackgroundUrl: {
+      type: String,
+      default: ''
     },
     preview: {
       type: Object,
@@ -198,6 +242,10 @@ export default {
     },
 
     //  Utils
+
+    backgroundUrl() {
+      return this.isObjectBackground ? this.objectBackgroundUrl : undefined
+    },
 
     fileTitle() {
       return this.preview
@@ -271,10 +319,7 @@ export default {
     originalDlPath() {
       if (this.preview) {
         const type = this.isMovie ? 'movies' : 'pictures'
-        return (
-          `/api/${type}/originals/preview-files/` +
-          `${this.preview.id}/download`
-        )
+        return `/api/${type}/originals/preview-files/${this.preview.id}/download`
       } else {
         return ''
       }
@@ -344,6 +389,14 @@ export default {
 
     // Sizing
 
+    getNaturalDimensions() {
+      if (this.isMovie) {
+        return this.videoViewer.getNaturalDimensions()
+      } else {
+        return this.pictureViewer.getNaturalDimensions()
+      }
+    },
+
     getDimensions() {
       const dimensions = { width: 0, height: 0 }
       if (this.container) {
@@ -358,22 +411,23 @@ export default {
     },
 
     resize() {
-      if (this.videoViewer) this.videoViewer.onWindowResize()
+      if (this.isPicture) this.pictureViewer.resetPicture()
+      if (this.isMovie) this.videoViewer.mountVideo()
       if (this.isSound) this.soundViewer.redraw()
-    },
-
-    getPreviewDimensions() {
-      const dimensions = { width: 0, height: 0 }
-      if (this.isMovie) {
-        return this.videoViewer.getDimensions()
-      } else if (this.isPicture) {
-        return this.pictureViewer.getDimensions()
-      }
-      return dimensions
     },
 
     setCurrentFrame(frameNumber) {
       this.videoViewer.setCurrentFrame(frameNumber)
+    },
+
+    onPictureSizeChanged(dimensions) {
+      dimensions.source = 'picture'
+      this.$emit('size-changed', dimensions)
+    },
+
+    onVideoSizeChanged(dimensions) {
+      dimensions.source = 'movie'
+      this.$emit('size-changed', dimensions)
     },
 
     // To use when you don't want to handle back pressure and rounding
@@ -381,9 +435,8 @@ export default {
       this.videoViewer.setCurrentTimeRaw(time)
     },
 
-    getCurrentTimeRaw(time) {
-      if (this.isMovie) return this.videoViewer.currentTimeRaw
-      else return 0
+    getCurrentTimeRaw() {
+      return this.isMovie ? this.videoViewer.currentTimeRaw : 0
     },
 
     // Loupe
@@ -412,7 +465,30 @@ export default {
     },
 
     resetZoom() {
-      this.pictureViewer.resetPanZoom()
+      if (this.pictureViewer) {
+        this.pictureViewer.resetPanZoom()
+      }
+      if (this.videoViewer) {
+        this.videoViewer.resetPanZoom()
+      }
+    },
+
+    pauseZoom() {
+      if (this.pictureViewer) {
+        this.pictureViewer.pausePanZoom()
+      }
+      if (this.videoViewer) {
+        this.videoViewer.pausePanZoom()
+      }
+    },
+
+    resumeZoom() {
+      if (this.pictureViewer) {
+        this.pictureViewer.resumePanZoom()
+      }
+      if (this.videoViewer) {
+        this.videoViewer.resumePanZoom()
+      }
     }
   },
 

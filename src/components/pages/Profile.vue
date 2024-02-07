@@ -4,8 +4,7 @@
       <div class="has-text-centered profile-header">
         <div class="profile-header-content has-text-centered">
           <people-avatar
-            ref="avatar"
-            :no-cache="true"
+            :is-lazy="false"
             :person="this.user"
             :size="150"
             :font-size="60"
@@ -289,7 +288,6 @@
           />
           <textarea
             class="input recovery-codes"
-            ref="textField"
             v-text="twoFA.OTPRecoveryCodes.join('\t')"
             readonly
           ></textarea>
@@ -1072,14 +1070,15 @@ export default {
     uploadAvatarFile() {
       this.changeAvatar.isLoading = true
       this.changeAvatar.isError = false
-      this.uploadAvatar(err => {
-        if (err) {
+      this.uploadAvatar()
+        .catch(err => {
+          console.error(err)
           this.changeAvatar.isError = true
-        }
-        this.changeAvatar.isLoading = false
-        this.$refs.avatar.reloadAvatar()
-        this.hideAvatarModal()
-      })
+        })
+        .finally(() => {
+          this.changeAvatar.isLoading = false
+          this.hideAvatarModal()
+        })
     },
 
     hideAvatarModal() {
@@ -1099,7 +1098,7 @@ export default {
     },
 
     saveRecoveryCodesToFile() {
-      var blob = new Blob([this.twoFA.OTPRecoveryCodes.join('\n')], {
+      const blob = new Blob([this.twoFA.OTPRecoveryCodes.join('\n')], {
         type: 'text/plain;charset=utf-8'
       })
       const link = document.createElement('a')
@@ -1331,8 +1330,14 @@ select {
   font-size: 1.5em;
   padding-left: 2.5em;
   padding-top: 0.5em;
-  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas,
-    Liberation Mono, monospace;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    SF Mono,
+    Menlo,
+    Consolas,
+    Liberation Mono,
+    monospace;
 }
 
 .action-icon {

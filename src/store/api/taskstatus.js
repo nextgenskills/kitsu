@@ -4,13 +4,16 @@ const sanitizeTaskStatus = taskStatus => {
   return {
     name: taskStatus.name,
     short_name: taskStatus.short_name,
+    for_concept: Boolean(taskStatus.for_concept === 'true'),
     is_default: Boolean(taskStatus.is_default === 'true'),
     is_done: Boolean(taskStatus.is_done === 'true'),
     is_retake: Boolean(taskStatus.is_retake === 'true'),
     is_artist_allowed: Boolean(taskStatus.is_artist_allowed === 'true'),
     is_client_allowed: Boolean(taskStatus.is_client_allowed === 'true'),
     is_feedback_request: Boolean(taskStatus.is_feedback_request === 'true'),
-    color: taskStatus.color
+    archived: Boolean(taskStatus.archived === 'true'),
+    color: taskStatus.color,
+    priority: taskStatus.priority
   }
 }
 
@@ -31,6 +34,21 @@ export default {
   updateTaskStatus(taskStatus) {
     const data = sanitizeTaskStatus(taskStatus)
     return client.pput(`/api/data/task-status/${taskStatus.id}`, data)
+  },
+
+  updateTaskStatusPriority(taskStatus) {
+    const data = { priority: taskStatus.priority }
+    return client.pput(`/api/data/task-status/${taskStatus.id}`, data)
+  },
+
+  async updateTaskStatusLink(taskStatusLink) {
+    const data = {
+      project_id: taskStatusLink.project_id,
+      task_status_id: taskStatusLink.task_status_id,
+      priority: taskStatusLink.priority,
+      roles_for_board: taskStatusLink.roles_for_board
+    }
+    return await client.ppost('/api/data/task-status-links', data)
   },
 
   deleteTaskStatus(taskStatus) {

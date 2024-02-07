@@ -22,18 +22,8 @@
           <img ref="picture-gif" :src="pictureGifPath" />
         </div>
         <div v-show="!isGif">
-          <img
-            ref="picture-big"
-            id="picture-big"
-            :src="pictureDlPath"
-            v-show="fullScreen"
-          />
-          <img
-            ref="picture"
-            id="picture"
-            :src="picturePath"
-            v-show="!fullScreen"
-          />
+          <img ref="picture-big" :src="pictureDlPath" v-show="fullScreen" />
+          <img ref="picture" :src="picturePath" v-show="!fullScreen" />
         </div>
       </div>
       <spinner v-if="isLoading" />
@@ -64,6 +54,10 @@ export default {
       type: Number,
       default: 0
     },
+    marginBottom: {
+      type: Number,
+      default: 0
+    },
     fullScreen: {
       type: Boolean,
       default: false
@@ -79,6 +73,10 @@ export default {
     preview: {
       type: Object,
       default: () => {}
+    },
+    panzoom: {
+      type: Boolean,
+      default: false
     }
   },
 
@@ -87,15 +85,16 @@ export default {
       isLoading: true,
       picturePath: '',
       pictureDlPath: '',
-      pictureGifPath: ''
+      pictureGifPath: '',
+      panzoomInstances: []
     }
   },
 
   mounted() {
     this.container.style.height = this.defaultHeight + 'px'
     this.isLoading = true
+    this.setPictureEmptyPath()
     if (this.picture.complete) {
-      this.isLoading = false
       this.onWindowResize()
     }
     this.picture.addEventListener('load', this.endLoading)
@@ -103,20 +102,23 @@ export default {
     this.pictureGif.addEventListener('load', this.endLoading)
     window.addEventListener('resize', this.onWindowResize)
     this.setPicturePath()
-    var element = document.querySelector('#picture-big')
-    if (!this.panzoom) {
-      this.panzoom = panzoom(element, {
-        bounds: true,
-        boundsPadding: 0.2,
-        maxZoom: 5,
-        minZoom: 1
-      })
+
+    if (this.panzoom) {
+      const pictures = [this.picture, this.pictureBig, this.pictureGif]
+      this.panzoomInstances = pictures.map(picture =>
+        panzoom(picture, {
+          bounds: true,
+          boundsPadding: 0.2,
+          maxZoom: 5,
+          minZoom: 1
+        })
+      )
     }
   },
 
   beforeDestroy() {
     window.removeEventListener('resize', this.onWindowResize)
-    if (this.panzoom) this.panzoom.dispose()
+    this.panzoomInstances.forEach(panzoom => panzoom.dispose())
   },
 
   computed: {
@@ -220,21 +222,21 @@ export default {
     },
 
     onWindowResize() {
-      const now = new Date().getTime()
-      this.lastCall = this.lastCall || 0
-      if (now - this.lastCall > 600) {
-        this.lastCall = now
-        this.$nextTick(this.resetPicture)
-        setTimeout(() => {
-          this.resetPicture()
-        }, 400)
-      }
+      this.resetPicture()
     },
 
     // Configuration
 
     endLoading() {
-      this.isLoading = false
+      if (
+        this.fullScreen &&
+        (this.pictureBig.complete || this.pictureGif.complete)
+      ) {
+        this.isLoading = false
+      } else if (!this.fullScreen && this.picture.complete) {
+        this.isLoading = false
+      }
+      this.$emit('loaded')
       this.$nextTick(this.resetPicture)
     },
 
@@ -246,9 +248,7 @@ export default {
         this.pictureWrapper.style['max-height'] = heightValue
         this.pictureSubWrapper.style['max-height'] = heightValue
       }
-      const dimensions = this.getDimensions()
-      const width = dimensions.width
-      const height = dimensions.height
+      let { width, height } = this.getDimensions()
       this.picture.style.width = width + 'px'
       this.picture.style.height = height + 'px'
       this.pictureBig.style.width = width + 'px'
@@ -261,7 +261,46 @@ export default {
       this.pictureBig.height = height
       this.pictureGif.width = width
       this.pictureGif.height = height
-      if (this.isPicture) this.$emit('size-changed', dimensions)
+
+      if (this.fullScreen) {
+        this.pictureBig.style.maxHeight = `calc(100vh - ${this.marginBottom}px)`
+      }
+
+      if (this.isPicture) {
+        const pictureElement = this.isGif
+          ? this.pictureGif
+          : this.fullScreen
+            ? this.pictureBig
+            : this.picture
+        const picturePosition = pictureElement.getBoundingClientRect()
+        const containerPosition = this.container.getBoundingClientRect()
+        const top = picturePosition.top - containerPosition.top
+        const left = picturePosition.left - containerPosition.left
+        width = picturePosition.width
+        height = picturePosition.height
+
+        this.resetPanZoom()
+
+        if (
+          !this.previousDimensions ||
+          this.previousDimensions.width !== width ||
+          this.previousDimensions.height !== height ||
+          this.previousDimensions.left !== left ||
+          this.previousDimensions.top !== top
+        ) {
+          this.$emit('size-changed', { width, height, top, left })
+        }
+        this.previousDimensions = { width, height, top, left }
+      }
+    },
+
+    setPictureEmptyPath() {
+      if (this.isGif && this.isPicture) {
+        this.pictureGifPath = null
+      } else if (this.preview && this.isPicture) {
+        this.picturePath = null
+        this.pictureDlPath = null
+      }
     },
 
     setPicturePath() {
@@ -318,8 +357,22 @@ export default {
     },
 
     resetPanZoom() {
-      this.panzoom.moveTo(0, 0)
-      this.panzoom.zoomAbs(0, 0, 1)
+      this.panzoomInstances.forEach(panzoom => {
+        panzoom.moveTo(0, 0)
+        panzoom.zoomAbs(0, 0, 1)
+      })
+    },
+
+    pausePanZoom() {
+      if (this.panzoomInstance) {
+        this.panzoomInstance.pause()
+      }
+    },
+
+    resumePanZoom() {
+      if (this.panzoomInstance) {
+        this.panzoomInstance.resume()
+      }
     }
   },
 
@@ -354,23 +407,26 @@ export default {
     },
 
     preview() {
-      this.resetPanZoom()
-      this.isLoading = true
-      this.setPicturePath()
-      this.setPictureDlPath()
-      if (this.currentIndex > 1) {
-        this.currentIndex = 1
-      }
-      if (this.fullScreen) {
-        if (this.pictureBig.complete) {
+      if (this.preview && this.preview.id !== this.lastPreviewId) {
+        this.lastPreviewId = this.preview.id
+        this.resetPanZoom()
+        this.isLoading = true
+        this.setPictureEmptyPath()
+        this.$nextTick(() => {
           this.resetPicture()
-          this.isLoading = false
-        }
-      } else {
-        if (this.picture.complete) {
-          this.isLoading = false
-        }
-        this.$nextTick(this.resetPicture)
+          this.setPicturePath()
+          this.setPictureDlPath()
+          if (this.currentIndex > 1) {
+            this.currentIndex = 1
+          }
+          if (this.fullScreen) {
+            if (this.pictureBig.complete) {
+              this.resetPicture()
+            }
+          } else {
+            this.$nextTick(this.resetPicture)
+          }
+        })
       }
     }
   }

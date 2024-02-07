@@ -18,7 +18,13 @@ const initialState = {
 const state = initialState
 
 const getters = {
-  taskStatus: state => state.taskStatus,
+  taskStatus: (
+    state // Wrong naming, keep it for compatibility
+  ) => state.taskStatus.filter(taskStatus => !taskStatus.archived),
+  taskStatuses: state =>
+    state.taskStatus.filter(taskStatus => !taskStatus.archived),
+  archivedTaskStatus: state =>
+    state.taskStatus.filter(taskStatus => taskStatus.archived),
   taskStatusMap: state => state.taskStatusMap,
   editTaskStatus: state => state.editTaskStatus,
   deleteTaskStatus: state => state.deleteTaskStatus,
@@ -42,21 +48,23 @@ const getters = {
   },
 
   getTaskStatusForCurrentUser:
-    (state, getters, rootState, rootGetters) => projectId => {
-      const statuses = rootGetters.getProductionTaskStatuses(projectId)
+    (state, getters, rootState, rootGetters) =>
+    (projectId, forConcept = false) => {
+      let statuses = forConcept
+        ? getters.taskStatuses
+        : rootGetters.getProductionTaskStatuses(projectId)
+      statuses = statuses.filter(
+        status => Boolean(status.for_concept) === forConcept
+      )
       if (
         rootGetters.isCurrentUserManager ||
         rootGetters.isCurrentUserSupervisor
       ) {
         return statuses
       } else if (rootGetters.isCurrentUserClient) {
-        return statuses.filter(taskStatus => {
-          return taskStatus.is_client_allowed
-        })
+        return statuses.filter(taskStatus => taskStatus.is_client_allowed)
       } else {
-        return statuses.filter(taskStatus => {
-          return taskStatus.is_artist_allowed
-        })
+        return statuses.filter(taskStatus => taskStatus.is_artist_allowed)
       }
     }
 }
@@ -90,6 +98,17 @@ const actions = {
       commit(EDIT_TASK_STATUS_END, taskStatus)
       Promise.resolve(taskStatus)
     })
+  },
+
+  updateTaskStatusPriority({ commit, state }, form) {
+    return taskStatusApi.updateTaskStatusPriority(form).then(taskStatus => {
+      commit(EDIT_TASK_STATUS_END, taskStatus)
+      Promise.resolve(taskStatus)
+    })
+  },
+
+  editTaskStatusLink({ commit, state }, data) {
+    return taskStatusApi.updateTaskStatusLink(data)
   },
 
   deleteTaskStatus({ commit, state }, taskStatus) {

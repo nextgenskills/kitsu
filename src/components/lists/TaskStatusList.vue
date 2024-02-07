@@ -28,15 +28,26 @@
             <th scope="col" class="is-feedback-request">
               {{ $t('task_status.fields.is_feedback_request') }}
             </th>
+            <th scope="col" class="is-concept">
+              {{ $t('task_status.fields.for_concept') }}
+            </th>
             <th scope="col" class="actions"></th>
           </tr>
         </thead>
-        <tbody class="datatable-body">
-          <tr class="datatable-row" v-for="entry in entries" :key="entry.id">
-            <td class="name">
-              {{ entry.name }}
-            </td>
-            <task-status-name class="short-name" :entry="entry" />
+        <draggable
+          class="datatable-body"
+          draggable=".task-status"
+          tag="tbody"
+          :value="entries"
+          @end="updateTaskStatusPriority($event.oldIndex, $event.newIndex)"
+        >
+          <tr
+            class="datatable-row task-status"
+            v-for="entry in entries"
+            :key="entry.id"
+          >
+            <td class="name">{{ entry.name }}</td>
+            <task-status-cell class="short-name" :entry="entry" />
             <boolean-cell class="is-default" :value="entry.is_default" />
             <boolean-cell class="is-done" :value="entry.is_done" />
             <boolean-cell class="is-retake" :value="entry.is_retake" />
@@ -52,6 +63,7 @@
               class="is-feedback-request"
               :value="entry.is_feedback_request"
             />
+            <boolean-cell class="is-concept" :value="entry.for_concept" />
             <row-actions-cell
               :entry-id="entry.id"
               :hide-delete="entry.is_default === true"
@@ -59,7 +71,7 @@
               @delete-clicked="$emit('delete-clicked', entry)"
             />
           </tr>
-        </tbody>
+        </draggable>
       </table>
     </div>
 
@@ -72,15 +84,18 @@
 </template>
 
 <script>
-import { mapGetters, mapActions } from 'vuex'
+import draggable from 'vuedraggable'
+
 import { formatListMixin } from '@/components/mixins/format'
+
 import BooleanCell from '@/components/cells/BooleanCell'
 import RowActionsCell from '@/components/cells/RowActionsCell'
 import TableInfo from '@/components/widgets/TableInfo'
-import TaskStatusName from '@/components/cells/TaskStatusName'
+import TaskStatusCell from '@/components/cells/TaskStatusCell'
 
 export default {
   name: 'task-status-list',
+
   mixins: [formatListMixin],
 
   props: {
@@ -98,20 +113,30 @@ export default {
     }
   },
 
-  data() {
-    return {}
-  },
   components: {
     BooleanCell,
+    draggable,
     RowActionsCell,
     TableInfo,
-    TaskStatusName
+    TaskStatusCell
   },
-  computed: {
-    ...mapGetters([])
-  },
+
   methods: {
-    ...mapActions([])
+    async updateTaskStatusPriority(oldIndex, newIndex) {
+      const taskStatuses = [...this.entries]
+      const taskStatus = taskStatuses[oldIndex]
+      taskStatuses.splice(oldIndex, 1)
+      taskStatuses.splice(newIndex, 0, taskStatus)
+      await this.updateTaskStatusPriorities(taskStatuses)
+    },
+
+    async updateTaskStatusPriorities(taskStatuses) {
+      const taskStatusPriorities = taskStatuses.map((taskStatus, index) => ({
+        id: taskStatus.id,
+        priority: index + 1
+      }))
+      this.$emit('update-priorities', taskStatusPriorities)
+    }
   }
 }
 </script>
@@ -138,9 +163,18 @@ export default {
 .is-retake,
 .is-artist-allowed,
 .is-client-allowed,
-.is-feedback-request {
+.is-feedback-request,
+.is-concept {
   text-align: center;
   width: 140px;
   min-width: 140px;
+}
+
+.task-status {
+  cursor: grab;
+}
+
+.task-status[draggable='true'] {
+  cursor: grabbing;
 }
 </style>

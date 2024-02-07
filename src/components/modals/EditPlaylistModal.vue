@@ -21,7 +21,7 @@
             ref="nameField"
             :label="$t('playlists.fields.name')"
             @enter="runConfirmation"
-            v-model="form.name"
+            v-model.trim="form.name"
             v-focus
           />
           <combobox-simple
@@ -113,7 +113,7 @@ export default {
       ],
       form: {
         name: this.playlistToEdit.name,
-        for_entity: this.playlistToEdit.for_entity || this.defaultForEntity,
+        for_entity: this.playlistToEdit.for_entity,
         for_client: this.playlistToEdit.for_client,
         is_for_all: this.currentEpisode && this.currentEpisode.id === 'all',
         task_type_id: this.taskTypeId
@@ -122,7 +122,11 @@ export default {
   },
 
   computed: {
-    ...mapGetters(['currentEpisode', 'productionTaskTypes']),
+    ...mapGetters([
+      'currentEpisode',
+      'currentProduction',
+      'productionTaskTypes'
+    ]),
 
     isEditing() {
       return this.playlistToEdit && this.playlistToEdit.id
@@ -130,22 +134,31 @@ export default {
 
     forEntityOptions() {
       if (
-        this.currentEpisode &&
-        ['main', 'all'].includes(this.currentEpisode.id)
+        (this.currentEpisode &&
+          ['main', 'all'].includes(this.currentEpisode.id)) ||
+        this.currentProduction.production_type === 'assets'
       ) {
         return [{ label: this.$t('assets.title'), value: 'asset' }]
+      } else if (this.currentProduction.production_type === 'shots') {
+        return [
+          { label: this.$t('shots.title'), value: 'shot' },
+          { label: this.$t('sequences.title'), value: 'sequence' }
+        ]
       } else {
         return [
           { label: this.$t('assets.title'), value: 'asset' },
-          { label: this.$t('shots.title'), value: 'shot' }
+          { label: this.$t('shots.title'), value: 'shot' },
+          { label: this.$t('sequences.title'), value: 'sequence' }
         ]
       }
     },
 
     defaultForEntity() {
+      const isOnlyAssets = this.currentProduction.production_type === 'assets'
+      const isOnlyShots = this.currentProduction.production_type === 'shots'
       const isAssetEpisode =
         this.currentEpisode && ['all', 'main'].includes(this.currentEpisode.id)
-      return isAssetEpisode ? 'asset' : 'shot'
+      return (isAssetEpisode || isOnlyAssets) && !isOnlyShots ? 'asset' : 'shot'
     },
 
     taskTypeList() {
@@ -164,6 +177,10 @@ export default {
 
   methods: {
     runConfirmation() {
+      if (!this.form.name) {
+        this.$refs.nameField.focus()
+        return
+      }
       this.form.for_client = this.forClient === 'true'
       this.$emit('confirm', this.form)
     },

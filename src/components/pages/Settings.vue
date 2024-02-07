@@ -1,51 +1,68 @@
 <template>
   <div class="settings page">
-    <div class="settings-content">
-      <div class="settings-body">
+    <div class="settings-form">
+      <form class="settings-header" @submit.prevent>
         <h2>
-          {{ $t('settings.title') }}
+          {{ $t('main.studio') }}
         </h2>
-        <p>
+        <div class="field">
           <label class="label">
             {{ $t('settings.logo') }}
           </label>
-        </p>
-        <div class="logo-wrapper" v-if="organisation.has_avatar">
-          <img :src="organisationLogoPath" />
+          <div class="logo-wrapper" v-if="form.has_avatar">
+            <img :src="organisationLogoPath" />
+          </div>
+          <p class="no-logo" v-else>
+            <em>{{ $t('settings.no_logo') }}</em>
+          </p>
+          <p>
+            <button
+              type="button"
+              class="button set-logo-button"
+              @click="showAvatarModal"
+            >
+              {{ $t('settings.set_logo') }}
+            </button>
+          </p>
+          <p v-if="form.has_avatar">
+            <button
+              type="button"
+              class="button is-link remove-logo-button"
+              @click="removeAvatar"
+            >
+              {{ $t('settings.remove_logo') }}
+            </button>
+          </p>
         </div>
-        <p class="no-logo" v-else>
-          {{ $t('settings.no_logo') }}
-        </p>
-        <p>
-          <button class="button set-logo-button" @click="showAvatarModal">
-            {{ $t('settings.set_logo') }}
-          </button>
-        </p>
+      </form>
+      <form ref="form" @submit.prevent="saveSettings">
+        <h2>
+          {{ $t('settings.title') }}
+        </h2>
         <text-field
           class="mt2"
           :label="$t('settings.fields.name')"
-          @enter="saveSettings()"
-          v-model="form.name"
+          :required="true"
+          v-model.trim="form.name"
         />
         <text-field
           :label="$t('settings.fields.hours_by_day')"
+          :min="1"
+          :max="24"
+          :required="true"
           type="number"
-          @enter="saveSettings()"
           v-model="form.hours_by_day"
         />
         <combobox-boolean
           :label="$t('settings.fields.use_original_name')"
-          @enter="saveSettings()"
           v-model="form.use_original_file_name"
         />
         <combobox-boolean
           :label="$t('settings.fields.show_hd_default')"
-          @enter="saveSettings()"
           v-model="form.hd_by_default"
         />
         <combobox-boolean
           :label="$t('settings.fields.timesheets_locked')"
-          @enter="saveSettings()"
           v-model="form.timesheets_locked"
         />
         <h2>
@@ -53,50 +70,37 @@
         </h2>
         <text-field
           :label="$t('settings.fields.slack_token')"
-          @enter="saveSettings()"
-          v-model="form.chat_token_slack"
+          v-model.trim="form.chat_token_slack"
         />
-
         <text-field
           :label="$t('settings.fields.discord_token')"
-          @enter="saveSettings()"
-          v-model="form.chat_token_discord"
+          v-model.trim="form.chat_token_discord"
         />
-
-        <div id="mattermost_integrations">
+        <div class="mattermost_integrations">
           <text-field
             :label="$t('settings.fields.mattermost_webhook')"
-            @enter="saveSettings()"
-            v-model="form.chat_webhook_mattermost"
+            v-model.trim="form.chat_webhook_mattermost"
           />
           <div
-            class="error pull-right"
+            class="error has-text-centered"
             v-if="this.errors.webhook_error === true"
           >
             <em>{{ $t('settings.webhook_error') }}</em>
           </div>
         </div>
-
         <button
+          class="button save-button is-medium"
           :class="{
-            button: true,
-            'save-button': true,
-            'is-medium': true,
             'is-loading': loading.save
           }"
-          @click="saveSettings()"
+          :disabled="loading.save || !this.$refs.form?.checkValidity()"
         >
           {{ $t('settings.save.button') }}
         </button>
-        <p
-          :class="{
-            error: true,
-            'is-hidden': !errors.save
-          }"
-        >
-          {{ $t('settings.save.error') }}
+        <p class="error has-text-centered mt2" v-if="errors.save">
+          <em>{{ $t('settings.save.error') }}</em>
         </p>
-      </div>
+      </form>
     </div>
 
     <change-avatar-modal
@@ -128,16 +132,17 @@ export default {
 
   data() {
     return {
-      organisationLogoKey: new Date().getUTCDate(),
       organisationLogoPath: '',
       form: {
-        name: '',
-        hours_by_day: 0,
-        original_file_name: 'false',
-        hd_by_default: 'false',
+        chat_token_discord: '',
         chat_token_slack: '',
         chat_webhook_mattermost: '',
-        chat_token_discord: ''
+        has_avatar: false,
+        hd_by_default: 'false',
+        hours_by_day: 0,
+        name: '',
+        timesheets_locked: 'false',
+        use_original_file_name: 'false'
       },
       errors: {
         save: false,
@@ -155,10 +160,7 @@ export default {
   },
 
   mounted() {
-    this.form = Object.assign(this.form, this.organisation)
-    this.organisationLogoKey = 'key' + new Date().toISOString()
-    this.organisationLogoPath =
-      '/api/pictures/thumbnails/organisations/' + `${this.organisation.id}.png`
+    this.organisationLogoPath = `/api/pictures/thumbnails/organisations/${this.organisation.id}.png`
   },
 
   computed: {
@@ -168,8 +170,9 @@ export default {
   methods: {
     ...mapActions([
       'changeAvatar',
-      'uploadOrganisationLogo',
-      'saveOrganisation'
+      'deleteOrganisationLogo',
+      'saveOrganisation',
+      'uploadOrganisationLogo'
     ]),
 
     checkWebhook() {
@@ -189,19 +192,21 @@ export default {
       this.modals.avatar = false
     },
 
+    showAvatarModal() {
+      this.modals.avatar = true
+    },
+
     saveSettings() {
       if (this.checkWebhook()) {
         this.loading.save = true
         this.errors.save = false
         this.saveOrganisation(this.form)
-          .then(() => {
-            this.loading.save = false
-            this.errors.save = false
-          })
           .catch(err => {
             console.error(err)
-            this.loading.save = false
             this.errors.save = true
+          })
+          .finally(() => {
+            this.loading.save = false
           })
       }
     },
@@ -212,41 +217,53 @@ export default {
       this.uploadOrganisationLogo(formData)
         .then(() => {
           setTimeout(() => {
-            this.loading.saveAvatar = false
             this.modals.avatar = false
-            this.organisationLogoPath =
-              '/api/pictures/thumbnails/organisations/' +
-              `${this.organisation.id}.png?t=` +
-              new Date().toISOString()
+            const timestamp = Date.now()
+            this.organisationLogoPath = `/api/pictures/thumbnails/organisations/${this.organisation.id}.png?t=${timestamp}`
           }, 500)
         })
         .catch(err => {
           console.error(err)
-          this.loading.saveAvatar = false
           this.errors.saveAvatar = true
+        })
+        .finally(() => {
+          this.loading.saveAvatar = false
         })
     },
 
-    showAvatarModal() {
-      this.modals.avatar = true
+    removeAvatar() {
+      this.loading.save = true
+      this.errors.save = false
+      this.deleteOrganisationLogo()
+        .catch(err => {
+          console.error(err)
+          this.errors.save = true
+        })
+        .finally(() => {
+          this.loading.save = false
+        })
     }
   },
 
   watch: {
-    organisation() {
-      this.form = {
-        name: this.organisation.name,
-        hours_by_day: this.organisation.hours_by_day,
-        use_original_file_name: this.organisation.use_original_file_name
-          ? 'true'
-          : 'false',
-        timesheets_locked: this.organisation.timesheets_locked
-          ? 'true'
-          : 'false',
-        hd_by_default: this.organisation.hd_by_default ? 'true' : 'false',
-        chat_token_slack: this.organisation.chat_token_slack,
-        chat_token_discord: this.organisation.chat_token_discord,
-        chat_webhook_mattermost: this.organisation.chat_webhook_mattermost
+    organisation: {
+      immediate: true,
+      handler() {
+        this.form = {
+          chat_token_discord: this.organisation.chat_token_discord,
+          chat_token_slack: this.organisation.chat_token_slack,
+          chat_webhook_mattermost: this.organisation.chat_webhook_mattermost,
+          has_avatar: this.organisation.has_avatar,
+          hd_by_default: this.organisation.hd_by_default ? 'true' : 'false',
+          hours_by_day: this.organisation.hours_by_day,
+          name: this.organisation.name,
+          timesheets_locked: this.organisation.timesheets_locked
+            ? 'true'
+            : 'false',
+          use_original_file_name: this.organisation.use_original_file_name
+            ? 'true'
+            : 'false'
+        }
       }
     }
   },
@@ -262,11 +279,11 @@ export default {
 <style lang="scss" scoped>
 .dark {
   .settings {
-    background: #36393f;
+    background: $dark-grey-2;
     color: $white-grey;
   }
 
-  .settings-content {
+  .settings-form {
     background: $dark-grey-lighter;
     color: $white-grey;
   }
@@ -277,16 +294,11 @@ export default {
   }
 }
 
-#mattermost_integrations {
+.mattermost_integrations {
   margin-bottom: 4em;
-}
-
-#mattermost_integrations .field {
-  margin-bottom: 0em;
-}
-
-strong {
-  text-transform: uppercase;
+  .field {
+    margin-bottom: 0em;
+  }
 }
 
 .settings {
@@ -294,18 +306,15 @@ strong {
   height: 100%;
 }
 
-.settings-content {
+.settings-form {
   background: white;
   max-width: 500px;
   margin: auto;
   margin-top: 2em;
   margin-bottom: 2em;
+  padding: 2em;
   box-shadow: rgba(0, 0, 0, 0.15) 0px 1px 4px 2px;
   border-radius: 1em;
-}
-
-.settings-body {
-  padding: 2em;
 }
 
 input,
@@ -341,5 +350,10 @@ h2:first-child {
 
 .no-logo {
   margin-bottom: 1em;
+}
+
+.remove-logo-button {
+  margin-top: 0.5rem;
+  font-size: 0.7em;
 }
 </style>

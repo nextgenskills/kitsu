@@ -8,7 +8,9 @@
       'is-loading': isLoading,
       'is-primary': isPrimary
     }"
+    :disabled="disabled"
     :title="title"
+    :type="type"
     @click="$emit('click')"
   >
     <grid-icon :class="iconClass" v-if="icon === 'grid'" />
@@ -51,6 +53,9 @@
     <pen-tool-icon :class="iconClass" v-if="icon === 'pen'" />
     <square-icon :class="iconClass" v-if="icon === 'eraser'" />
     <key-icon :class="iconClass" v-if="icon == 'key'" />
+    <zoom-in-icon :class="iconClass" v-if="icon == 'loupe'" />
+    <globe-icon :class="iconClass" v-if="icon == 'globe'" />
+    <codepen-icon :class="iconClass" v-if="icon == 'codepen'" />
     <span :class="iconClass" v-if="icon === 'laser'"> ⦿ </span>
     <span
       :class="{
@@ -69,12 +74,14 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CodepenIcon,
   CornerLeftDownIcon,
   CornerRightDownIcon,
   CopyIcon,
   DownloadIcon,
   EditIcon,
   Edit2Icon,
+  GlobeIcon,
   GridIcon,
   FilmIcon,
   FilterIcon,
@@ -105,7 +112,8 @@ import {
   UploadIcon,
   VolumeXIcon,
   Volume2Icon,
-  XIcon
+  XIcon,
+  ZoomInIcon
 } from 'vue-feather-icons'
 
 export default {
@@ -114,6 +122,7 @@ export default {
     ChevronDownIcon,
     ChevronLeftIcon,
     ChevronRightIcon,
+    CodepenIcon,
     CornerLeftDownIcon,
     CornerRightDownIcon,
     CopyIcon,
@@ -122,11 +131,13 @@ export default {
     Edit2Icon,
     FilmIcon,
     FilterIcon,
+    GlobeIcon,
     GridIcon,
     ImageIcon,
     KeyIcon,
     LayersIcon,
     ListIcon,
+    ZoomInIcon,
     MaximizeIcon,
     MessageSquareIcon,
     MinusIcon,
@@ -155,6 +166,10 @@ export default {
 
   props: {
     active: {
+      default: false,
+      type: Boolean
+    },
+    disabled: {
       default: false,
       type: Boolean
     },
@@ -189,6 +204,10 @@ export default {
     title: {
       default: '',
       type: String
+    },
+    type: {
+      type: String,
+      validator: value => ['submit', 'button', 'reset'].includes(value)
     }
   },
 

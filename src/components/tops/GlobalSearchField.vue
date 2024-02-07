@@ -190,7 +190,11 @@ export default {
 
   mounted() {
     window.addEventListener('keydown', event => {
-      if (event.ctrlKey && event.altKey && event.keyCode === 70) {
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        event.altKey &&
+        event.keyCode === 70
+      ) {
         if (this.$refs['global-search-field']) {
           this.$refs['global-search-field'].focus()
         }
@@ -240,9 +244,14 @@ export default {
     },
 
     onElementSelected() {
-      document.getElementById('result-link-' + this.selectedIndex).click()
-      this.isSearchActive = false
-      this.searchQuery = ''
+      const element = document.getElementById(
+        `result-link-${this.selectedIndex}`
+      )
+      if (element) {
+        element.click()
+        this.isSearchActive = false
+        this.searchQuery = ''
+      }
     },
 
     onBlur(event) {
@@ -263,10 +272,9 @@ export default {
         this.searchData({ query: this.searchQuery })
           .then(results => {
             this.assets = results.assets
-            results.persons.forEach(person => {
-              peopleStore.helpers.addAdditionalInformation(person)
-            })
-            this.persons = results.persons
+            this.persons = results.persons.map(
+              peopleStore.helpers.addAdditionalInformation
+            )
             this.shots = results.shots
           })
           .catch(console.error)

@@ -31,7 +31,7 @@
           @enter="confirm"
         />
 
-        <div v-if="form.data_type === 'list'">
+        <div v-if="['list', 'taglist'].includes(form.data_type)">
           <p class="strong">
             {{ $t('productions.metadata.available_values') }}
           </p>
@@ -58,7 +58,7 @@
           <text-field
             ref="addChoiceField"
             v-model.trim="valueToAdd"
-            :button-label="$t('Add value')"
+            :button-label="$t('main.add')"
             @enter="addValue"
           />
         </div>
@@ -226,6 +226,10 @@ export default {
           value: 'list'
         },
         {
+          label: this.$t('productions.metadata.tags'),
+          value: 'taglist'
+        },
+        {
           label: this.$t('productions.metadata.checklist'),
           value: 'checklist'
         }
@@ -282,7 +286,8 @@ export default {
       return (
         this.form.name.length &&
         (['string', 'number', 'boolean'].includes(this.form.data_type) ||
-          (this.form.data_type === 'list' && this.form.values.length) ||
+          (['list', 'taglist'].includes(this.form.data_type) &&
+            this.form.values.length) ||
           (this.form.data_type === 'checklist' &&
             this.checklist?.[0]?.text.length)) &&
         (!this.isCurrentUserSupervisor ||
@@ -303,9 +308,16 @@ export default {
       const newValue = this.$refs.addChoiceField.value
       if (!this.form.values.find(v => v === newValue) && newValue) {
         this.form.values.push(newValue)
+        if (this.form.data_type === 'taglist') {
+          this.form.values.sort()
+        }
         this.valueToAdd = ''
         this.$nextTick(() => {
-          this.valueList.scrollTop = this.valueList.scrollHeight
+          const newValueIndex = this.form.values.findIndex(v => v === newValue)
+          const newValuePosition =
+            (this.valueList.scrollHeight / this.form.values.length) *
+            newValueIndex
+          this.valueList.scrollTop = newValuePosition
         })
       }
       return newValue
@@ -369,6 +381,9 @@ export default {
         this.checklist = this.getDescriptorChecklistValues(
           this.descriptorToEdit
         )
+        if (this.form.data_type === 'taglist') {
+          this.form.values.sort()
+        }
       } else {
         this.form = {
           name: '',

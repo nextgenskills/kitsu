@@ -9,12 +9,9 @@ import Autocomplete from 'v-autocomplete'
 import Chart from 'chart.js'
 import Meta from 'vue-meta'
 import VueChartkick from 'vue-chartkick'
-import VueCookie from 'vue-cookie'
 import VueDragDrop from 'vue-drag-drop'
-import VueLazyload from 'vue-lazyload'
 import vuescroll from 'vue-scroll'
 import VueTextareaAutosize from 'vue-textarea-autosize'
-import VTooltip from 'v-tooltip'
 import VueWebsocket from 'vue-websocket-next'
 import IO from 'socket.io-client'
 import 'v-autocomplete/dist/v-autocomplete.css'
@@ -26,10 +23,7 @@ Vue.config.productionTip = false
 Vue.use(Autocomplete)
 Vue.use(Meta)
 Vue.use(resizableColumn)
-Vue.use(VTooltip)
 Vue.use(VueChartkick, { adapter: Chart })
-Vue.use(VueCookie)
-Vue.use(VueLazyload)
 Vue.use(vuescroll)
 Vue.use(VueDragDrop)
 Vue.use(VueTextareaAutosize)
@@ -41,8 +35,8 @@ sync(store, router)
 // Global custom directive to enable automatic focus on field after page
 // loading.
 Vue.directive('focus', {
-  inserted(el) {
-    el.focus()
+  inserted(el, binding) {
+    el.focus(binding.value)
   }
 })
 

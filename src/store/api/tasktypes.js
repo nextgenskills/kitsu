@@ -21,7 +21,8 @@ export default {
     const data = {
       name: taskType.name,
       color: taskType.color,
-      department_id: taskType.department_id
+      department_id: taskType.department_id,
+      archived: taskType.archived === 'true'
     }
     if (taskType.priority && taskType.priority > 0) {
       data.priority = Number(taskType.priority)

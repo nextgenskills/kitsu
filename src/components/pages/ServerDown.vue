@@ -11,7 +11,7 @@
 </template>
 
 <script>
-import { mapGetters, mapActions } from 'vuex'
+import { mapGetters } from 'vuex'
 import auth from '@/lib/auth'
 
 export default {
@@ -19,13 +19,10 @@ export default {
   computed: {
     ...mapGetters(['isAuthenticated', 'user'])
   },
-  methods: {
-    ...mapActions([])
-  },
   mounted() {
     auth.isServerLoggedIn(err => {
-      const target = this.$store.state.route.query.redirect
       if (!err) {
+        const target = this.$store.state.route.query.redirect || '/'
         this.$router.push(target)
       }
     })
@@ -34,9 +31,16 @@ export default {
 </script>
 
 <style lang="scss" scoped>
+.page {
+}
+
 .illustration {
   max-width: 1000px;
   margin: auto;
+  img {
+    border-radius: 3rem;
+    margin-bottom: 2rem;
+  }
 }
 
 p {
@@ -46,5 +50,11 @@ p {
   a {
     text-decoration: underline;
   }
+}
+
+.title {
+  color: var(--text);
+  font-weight: bold;
+  font-size: 2.4em;
 }
 </style>

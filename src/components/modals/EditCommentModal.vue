@@ -13,10 +13,10 @@
           {{ $t('comments.edit_title') }}
         </h1>
 
-        <form v-on:submit.prevent>
-          <combo-box-status
+        <form @submit.prevent>
+          <combobox-status
             :label="$t('task_status.title')"
-            :task-status-list="taskStatusForCurrentUser"
+            :task-status-list="taskStatuses"
             v-model="form.task_status_id"
           />
 
@@ -24,19 +24,40 @@
             <label class="label">
               {{ $t('comments.text') }}
             </label>
-            <at-ta :members="team" name-key="full_name" limit="2">
+            <at-ta
+              :members="atOptions"
+              name-key="full_name"
+              limit="2"
+              @input="onAtTextChanged"
+            >
               <template slot="item" slot-scope="team">
-                <div class="flexrow">
-                  <people-avatar
-                    class="flexrow-item"
-                    :person="team.item"
-                    :size="20"
-                    :no-cache="true"
-                  />
-                  <span class="flexrow-item">
-                    {{ team.item.full_name }}
+                <template v-if="team.item.isTime"> ⏱️ frame </template>
+                <template v-else-if="team.item.isDepartment">
+                  <span
+                    class="mr05"
+                    :style="{
+                      background: team.item.color,
+                      width: '10px',
+                      height: '10px',
+                      'border-radius': '50%'
+                    }"
+                  >
+                    &nbsp;
                   </span>
-                </div>
+                  {{ team.item.full_name }}
+                </template>
+                <template v-else>
+                  <div class="flexrow">
+                    <people-avatar
+                      class="flexrow-item"
+                      :person="team.item"
+                      :size="20"
+                    />
+                    <span class="flexrow-item">
+                      {{ team.item.full_name }}
+                    </span>
+                  </div>
+                </template>
               </template>
 
               <textarea
@@ -61,6 +82,7 @@
                 : [{ checked: false, text: '' }]
             "
             @add-item="onAddChecklistItem"
+            @insert-item="onInsertChecklistItem"
             @remove-task="removeTask"
           />
           <label class="label">
@@ -126,14 +148,16 @@
 <script>
 import { mapGetters } from 'vuex'
 import { modalMixin } from '@/components/modals/base_modal'
-import { remove } from '@/lib/models'
+
 import files from '@/lib/files'
+import { remove } from '@/lib/models'
+import { replaceTimeWithTimecode } from '@/lib/render'
 
 import { XIcon } from 'vue-feather-icons'
 
 import AtTa from 'vue-at/dist/vue-at-textarea'
 import Checklist from '@/components/widgets/Checklist'
-import ComboBoxStatus from '@/components/widgets/ComboboxStatus.vue'
+import ComboboxStatus from '@/components/widgets/ComboboxStatus.vue'
 import FileUpload from '@/components/widgets/FileUpload'
 import ModalFooter from '@/components/modals/ModalFooter'
 import PeopleAvatar from '@/components/widgets/PeopleAvatar'
@@ -144,7 +168,7 @@ export default {
   components: {
     AtTa,
     Checklist,
-    ComboBoxStatus,
+    ComboboxStatus,
     FileUpload,
     ModalFooter,
     PeopleAvatar,
@@ -156,6 +180,14 @@ export default {
       type: Boolean,
       default: false
     },
+    frame: {
+      type: Number,
+      default: 0
+    },
+    commentToEdit: {
+      type: Object,
+      default: () => {}
+    },
     isLoading: {
       type: Boolean,
       default: false
@@ -164,13 +196,17 @@ export default {
       type: Boolean,
       default: false
     },
-    commentToEdit: {
-      type: Object,
-      default: () => {}
-    },
     team: {
       type: Array,
       default: () => []
+    },
+    fps: {
+      type: Number,
+      default: 25
+    },
+    revision: {
+      type: Number,
+      default: 1
     }
   },
 
@@ -187,7 +223,23 @@ export default {
   },
 
   computed: {
-    ...mapGetters(['taskStatusForCurrentUser'])
+    ...mapGetters([
+      'departmentMap',
+      'getTaskStatusForCurrentUser',
+      'isCurrentUserClient',
+      'productionDepartmentIds',
+      'taskStatusForCurrentUser'
+    ]),
+
+    taskStatuses() {
+      return this.isConceptTask
+        ? this.getTaskStatusForCurrentUser(null, true)
+        : this.taskStatusForCurrentUser.filter(status => !status.for_concept)
+    },
+
+    isConceptTask() {
+      return this.$route.path.includes('concept')
+    }
   },
 
   methods: {
@@ -250,6 +302,24 @@ export default {
     onAddChecklistItem(item) {
       delete item.index
       this.form.checklist.push(item)
+    },
+
+    onInsertChecklistItem(item) {
+      this.form.checklist.splice(item.index, 0, item)
+      for (let i = 0; i < this.form.checklist.length; i++) {
+        this.form.checklist[i].index = i
+      }
+    },
+
+    onAtTextChanged(input) {
+      if (input.includes('@frame')) {
+        this.form.text = replaceTimeWithTimecode(
+          input,
+          this.revision,
+          this.frame + 1,
+          this.fps
+        )
+      }
     }
   },
 
@@ -264,6 +334,35 @@ export default {
           this.reset()
           this.$refs.textField.focus()
         }, 100)
+      }
+    },
+
+    team: {
+      deep: true,
+      immediate: true,
+      handler() {
+        if (this.isCurrentUserClient) {
+          this.atOptions = this.team.filter(person =>
+            ['admin', 'manager', 'supervisor', 'client'].includes(person.role)
+          )
+        } else {
+          this.atOptions = [...this.team]
+        }
+        this.atOptions = this.atOptions.concat(
+          this.productionDepartmentIds.map(departmentId => {
+            const department = this.departmentMap.get(departmentId)
+            return {
+              isDepartment: true,
+              full_name: department.name,
+              color: department.color,
+              id: departmentId
+            }
+          })
+        )
+        this.atOptions.push({
+          isTime: true,
+          full_name: 'frame'
+        })
       }
     }
   }

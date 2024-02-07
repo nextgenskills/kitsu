@@ -3,7 +3,12 @@
  */
 import { mapGetters } from 'vuex'
 
-import { formatDate, formatFullDate, formatSimpleDate } from '@/lib/time'
+import {
+  formatDate,
+  formatFullDate,
+  formatSimpleDate,
+  minutesToDays
+} from '@/lib/time'
 
 export const formatListMixin = {
   created() {},
@@ -25,15 +30,17 @@ export const formatListMixin = {
     formatFullDate,
     formatSimpleDate,
 
-    formatDuration(duration) {
-      if (duration) {
-        return (duration / 60 / this.organisation.hours_by_day).toLocaleString(
-          'fullwide',
-          { maximumFractionDigits: 2 }
-        )
-      } else {
+    formatDuration(minutes, toLocale = true) {
+      if (!minutes) {
         return 0
       }
+      const days = minutesToDays(this.organisation, minutes)
+      if (toLocale) {
+        return days.toLocaleString('fullwide', {
+          maximumFractionDigits: 2
+        })
+      }
+      return days
     },
 
     formatPriority(priority) {
@@ -48,6 +55,11 @@ export const formatListMixin = {
         label = this.$t('tasks.priority.emergency')
       }
       return label
+    },
+
+    formatPrioritySymbol(priority) {
+      priority = Math.max(0, Math.min(priority, 3))
+      return '!'.repeat(priority)
     },
 
     sanitizeInteger(value) {

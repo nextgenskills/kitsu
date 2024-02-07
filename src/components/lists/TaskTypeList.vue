@@ -14,13 +14,14 @@
             <th scope="col" class="actions"></th>
           </tr>
         </thead>
+
         <draggable
           class="datatable-body"
-          v-model="assetsItems"
           draggable=".tasktype-item"
-          tag="tbody"
           :sort="true"
+          tag="tbody"
           @end="updatePriorityAssets"
+          v-model="assetsItems"
         >
           <tr class="datatable-type-header" slot="header">
             <th scope="rowgroup" colspan="4">
@@ -50,7 +51,15 @@
               @edit-clicked="$emit('edit-clicked', taskType)"
             />
           </tr>
+          <tr class="empty" v-if="assetsItems.length === 0">
+            <th scope="rowgroup" colspan="4">
+              <span class="text">
+                {{ $t('task_types.no_task_types') }}
+              </span>
+            </th>
+          </tr>
         </draggable>
+
         <draggable
           class="datatable-body"
           v-model="shotsItems"
@@ -87,7 +96,15 @@
               @edit-clicked="$emit('edit-clicked', taskType)"
             />
           </tr>
+          <tr class="empty" v-if="shotsItems.length === 0">
+            <th scope="rowgroup" colspan="4">
+              <span class="text">
+                {{ $t('task_types.no_task_types') }}
+              </span>
+            </th>
+          </tr>
         </draggable>
+
         <draggable
           class="datatable-body"
           v-model="editsItems"
@@ -123,6 +140,13 @@
               @delete-clicked="$emit('delete-clicked', taskType)"
               @edit-clicked="$emit('edit-clicked', taskType)"
             />
+          </tr>
+          <tr class="empty" v-if="editsItems.length === 0">
+            <th scope="rowgroup" colspan="4">
+              <span class="text">
+                {{ $t('task_types.no_task_types') }}
+              </span>
+            </th>
           </tr>
         </draggable>
 
@@ -161,6 +185,13 @@
               @delete-clicked="$emit('delete-clicked', taskType)"
               @edit-clicked="$emit('edit-clicked', taskType)"
             />
+          </tr>
+          <tr class="empty" v-if="sequencesItems.length === 0">
+            <th scope="rowgroup" colspan="4">
+              <span class="text">
+                {{ $t('task_types.no_task_types') }}
+              </span>
+            </th>
           </tr>
         </draggable>
 
@@ -201,6 +232,13 @@
             />
           </tr>
         </draggable>
+        <tr class="empty" v-if="episodesItems.length === 0">
+          <th scope="rowgroup" colspan="4">
+            <span class="text">
+              {{ $t('task_types.no_task_types') }}
+            </span>
+          </th>
+        </tr>
       </table>
     </div>
 
@@ -213,13 +251,14 @@
 </template>
 
 <script>
-import { mapGetters, mapActions } from 'vuex'
+import { mapGetters } from 'vuex'
 import draggable from 'vuedraggable'
+
 import BooleanRep from '@/components/widgets/BooleanRep'
 import DepartmentName from '@/components/widgets/DepartmentName.vue'
 import RowActionsCell from '@/components/cells/RowActionsCell'
 import TableInfo from '@/components/widgets/TableInfo'
-import TaskTypeCell from '@/components/cells/TaskTypeName'
+import TaskTypeCell from '@/components/cells/TaskTypeCell'
 
 export default {
   name: 'task-type-list',
@@ -258,8 +297,6 @@ export default {
     TaskTypeCell
   },
 
-  mounted() {},
-
   computed: {
     ...mapGetters(['getDepartments']),
 
@@ -285,8 +322,6 @@ export default {
   },
 
   methods: {
-    ...mapActions([]),
-
     getTaskTypesForEntity(entity) {
       return this.entries.filter(taskType => taskType.for_entity === entity)
     },
@@ -385,7 +420,7 @@ export default {
   width: 100px;
 }
 
-.tasktype-item[draggable='false'] {
+.tasktype-item {
   cursor: grab;
 }
 
@@ -395,5 +430,17 @@ export default {
 
 tr {
   cursor: pointer;
+}
+
+.empty {
+  span {
+    color: var(--text);
+    font-weight: normal;
+    font-style: italic;
+  }
+}
+
+.data-list {
+  margin-top: 0;
 }
 </style>

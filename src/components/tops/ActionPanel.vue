@@ -1,23 +1,11 @@
 <template>
   <div>
-    <div
-      ref="action-bar"
-      :class="{
-        'action-topbar': true,
-        unselectable: true,
-        minimized
-      }"
-      :style="{
-        left: position.left + 'px',
-        top: position.top + 'px'
-      }"
-    >
+    <div class="action-topbar unselectable">
       <div class="menu">
         <div class="flexrow">
           <div
+            class="menu-item status-item"
             :class="{
-              'menu-item': true,
-              'status-item': true,
               active: selectedBar === 'change-status'
             }"
             :title="$t('menu.change_status')"
@@ -25,42 +13,48 @@
             v-if="
               (isCurrentUserManager ||
                 isSupervisorInDepartment ||
-                isInDepartment) &&
+                isInDepartment ||
+                isCurrentViewTodos) &&
               !isEntitySelection &&
               isTaskSelection &&
               nbSelectedTasks > 1
             "
           >
-            STATUS
+            {{ $t('main.status') }}
           </div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'assignation'
             }"
             :title="$t('menu.assign_tasks')"
             @click="selectBar('assignation')"
             v-if="
-              isCurrentViewEntity &&
+              (isCurrentViewSingleEntity || isCurrentViewEntity) &&
               (isCurrentUserManager ||
                 isSupervisorInDepartment ||
-                isInDepartment) &&
+                isInDepartment ||
+                isCurrentViewSingleEntity) &&
               !isEntitySelection &&
-              isTaskSelection
+              isTaskSelection &&
+              !isCurrentUserArtist
             "
           >
             <user-icon />
           </div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'priorities'
             }"
             :title="$t('menu.change_priority')"
             v-if="
-              (isCurrentViewEntity || isCurrentViewPerson) &&
+              (isCurrentViewSingleEntity ||
+                isCurrentViewEntity ||
+                isCurrentViewPerson ||
+                isCurrentViewSingleEntity) &&
               (isCurrentUserManager || isSupervisorInDepartment) &&
               !isEntitySelection &&
               isTaskSelection
@@ -71,27 +65,52 @@
           </div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'thumbnails'
             }"
             :title="$t('menu.set_thumbnails')"
-            v-if="isTaskSelection"
+            v-if="
+              isTaskSelection &&
+              !this.isCurrentUserArtist &&
+              !isCurrentViewConcept
+            "
             @click="selectBar('thumbnails')"
           >
             <image-icon />
           </div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'subscribe'
             }"
             :title="$t('menu.subscribe')"
-            v-if="isTaskSelection"
+            v-if="
+              isTaskSelection &&
+              !isCurrentViewSingleEntity &&
+              !isCurrentViewTodos &&
+              !isCurrentViewConcept
+            "
             @click="selectBar('subscribe')"
           >
             <eye-icon />
+          </div>
+
+          <div
+            class="menu-item ml05"
+            :class="{
+              active: selectedBar === 'edit-concepts'
+            }"
+            :title="$t('menu.edit_concepts')"
+            @click="selectBar('edit-concepts')"
+            v-if="
+              isCurrentViewConcept &&
+              (isCurrentUserManager || isConceptPublisher) &&
+              isTaskSelection
+            "
+          >
+            <link-icon />
           </div>
 
           <div
@@ -100,16 +119,19 @@
           ></div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'playlists'
             }"
             :title="$t('menu.generate_playlist')"
             v-if="
               (isCurrentViewAsset ||
                 isCurrentViewShot ||
+                isCurrentViewSequence ||
+                isCurrentViewTodos ||
                 isCurrentViewTaskType) &&
               !isEntitySelection &&
+              !isCurrentViewSingleEntity &&
               isTaskSelection &&
               nbSelectedTasks > 0
             "
@@ -124,6 +146,7 @@
                 isCurrentViewShot ||
                 isCurrentViewTaskType) &&
               !isEntitySelection &&
+              !isCurrentViewSingleEntity &&
               isTaskSelection &&
               isCurrentUserManager
             "
@@ -131,8 +154,8 @@
           ></div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'create-tasks'
             }"
             :title="$t('menu.create_tasks')"
@@ -149,8 +172,8 @@
           </div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'delete-tasks'
             }"
             :title="$t('menu.delete_tasks')"
@@ -159,6 +182,7 @@
               isCurrentViewEntity &&
               isCurrentUserManager &&
               !isEntitySelection &&
+              !isCurrentViewSingleEntity &&
               isTaskSelection
             "
           >
@@ -171,14 +195,15 @@
               !isEntitySelection &&
               isTaskSelection &&
               !isCurrentViewEpisode &&
+              !isCurrentViewConcept &&
               customActions &&
               customActions.length > 0
             "
           ></div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'custom-actions'
             }"
             :title="$t('menu.run_custom_action')"
@@ -188,6 +213,7 @@
               !isEntitySelection &&
               isTaskSelection &&
               !isCurrentViewEpisode &&
+              !isCurrentViewConcept &&
               customActions &&
               customActions.length > 0
             "
@@ -196,8 +222,8 @@
           </div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'delete-assets'
             }"
             :title="$t('menu.delete_assets')"
@@ -210,8 +236,8 @@
           </div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'delete-shots'
             }"
             :title="$t('menu.delete_shots')"
@@ -222,13 +248,28 @@
           </div>
 
           <div
+            class="menu-item"
             :class="{
-              'menu-item': true,
               active: selectedBar === 'delete-edits'
             }"
             :title="$t('menu.delete_edits')"
             @click="selectBar('delete-edits')"
             v-if="isCurrentViewEdit && isCurrentUserManager && !isTaskSelection"
+          >
+            <trash-icon />
+          </div>
+
+          <div
+            class="menu-item"
+            :class="{
+              active: selectedBar === 'delete-concepts'
+            }"
+            :title="$t('menu.delete_concepts')"
+            @click="selectBar('delete-concepts')"
+            v-if="
+              isCurrentViewConcept &&
+              (isCurrentUserManager || isConceptPublisher)
+            "
           >
             <trash-icon />
           </div>
@@ -245,15 +286,6 @@
           >
             <download-icon />
           </div>
-
-          <!--div class="flexrow-item close-bar" @click="minimized = !minimized">
-            <minus-icon v-if="!minimized" />
-            <square-icon v-else />
-          </div-->
-
-          <!--div class="flexrow-item close-bar" @click="clearSelection">
-            <x-icon />
-          </div-->
         </div>
       </div>
 
@@ -281,10 +313,8 @@
 
           <div class="flexrow-item is-wide">
             <button
+              class="button confirm-button is-wide"
               :class="{
-                button: true,
-                'confirm-button': true,
-                'is-wide': true,
                 'is-loading': loading.changeStatus
               }"
               @click="confirmTaskStatusChange"
@@ -309,7 +339,7 @@
           </div>
           <div class="flexrow mb05">
             <people-field
-              class="flexrow-item is-wide"
+              class="flexrow-item is-wide assignation-field"
               ref="assignation-field"
               :people="currentTeam"
               :placeholder="$t('tasks.assign_explaination')"
@@ -388,10 +418,8 @@
           </div>
           <div class="flexrow-item is-wide">
             <button
+              class="button confirm-button is-wide"
               :class="{
-                button: true,
-                'confirm-button': true,
-                'is-wide': true,
                 'is-loading': loading.changePriority
               }"
               @click="confirmPriorityChange"
@@ -407,10 +435,8 @@
 
         <div class="flexrow is-wide" v-if="selectedBar === 'create-tasks'">
           <button
+            class="button confirm-button is-wide"
             :class="{
-              button: true,
-              'confirm-button': true,
-              'is-wide': true,
               'is-loading': loading.taskCreation
             }"
             @click="confirmTaskCreation"
@@ -422,10 +448,8 @@
 
         <div class="flexrow-item is-wide" v-if="selectedBar === 'thumbnails'">
           <button
+            class="button confirm-button is-wide"
             :class="{
-              button: true,
-              'confirm-button': true,
-              'is-wide': true,
               'is-loading': loading.setThumbnails
             }"
             @click="confirmSetThumbnailsFromTasks"
@@ -440,6 +464,10 @@
           <div v-else>
             <button
               class="button confirm-button is-wide"
+              :class="{
+                'is-loading':
+                  loading.setThumbnails || isSetFrameThumbnailLoading
+              }"
               @click="confirmSetThumbnailsFromTasks"
             >
               {{ $t('tasks.set_preview') }}
@@ -468,11 +496,7 @@
 
           <div class="flexrow-item is-wide" v-if="!loading.tasksSubscription">
             <button
-              :class="{
-                button: true,
-                'confirm-button': true,
-                'is-wide': true
-              }"
+              class="button confirm-button is-wide"
               @click="confirmTasksSubscription"
             >
               {{
@@ -501,15 +525,33 @@
           </button>
         </div>
 
+        <div
+          class="flexrow-item is-wide"
+          v-if="selectedBar === 'edit-concepts'"
+        >
+          <h3 class="mb05">{{ $t('concepts.actions.title') }}</h3>
+          <ul class="tags mb05">
+            <li v-if="!conceptLinkedEntities.length">
+              <em>{{ $t('concepts.actions.empty') }}</em>
+            </li>
+            <template v-else>
+              <li
+                :key="entity.id"
+                class="tag"
+                @click="onRemoveLink(entity)"
+                v-for="entity in conceptLinkedEntities"
+              >
+                {{ entity.name }}
+              </li>
+            </template>
+          </ul>
+        </div>
+
         <div class="flexrow-item is-wide" v-if="selectedBar === 'delete-tasks'">
           <div class="flexrow is-wide">
             <button
               class="button is-danger confirm-button is-wide"
               :class="{
-                button: true,
-                'is-danger': true,
-                'confirm-button': true,
-                'is-wide': true,
                 'is-loading': loading.taskDeletion
               }"
               @click="confirmTaskDeletion"
@@ -665,8 +707,77 @@
             @confirm="confirmEpisodeDeletion"
           />
         </div>
+
+        <div
+          class="flexrow-item is-wide"
+          v-if="selectedBar === 'delete-concepts'"
+        >
+          <delete-entities
+            :error-text="$t('concepts.multiple_delete_error')"
+            :is-loading="loading.episodeDeletion"
+            :is-error="errors.deleteEpisode"
+            :text="
+              $tc('concepts.delete_for_selection', nbSelectedConcepts, {
+                nbSelectedConcepts
+              })
+            "
+            @confirm="confirmConceptDeletion"
+          />
+        </div>
       </div>
     </div>
+
+    <div
+      class="flexrow-item is-wide pa1"
+      v-if="selectedBar === 'edit-concepts'"
+    >
+      <div ref="asset-list" class="concept-links">
+        <h2 class="subtitle">{{ $t('concepts.add_links') }}</h2>
+        <div class="flexrow mb2">
+          <search-field
+            ref="entity-search-field"
+            @change="onEntitySearchChange"
+          />
+          <button-simple
+            class="flexrow-item"
+            :title="$t('entities.build_filter.title')"
+            icon="funnel"
+            @click="modals.buildFilter = true"
+          />
+        </div>
+        <spinner v-if="loading.links" />
+        <div class="link-list" v-else>
+          <ul
+            class="link-types"
+            :key="`link-types-${index}`"
+            v-for="(linkGroup, index) in availableLinksByType"
+          >
+            <li class="link-type">
+              <h4 class="subtitle">
+                {{ linkGroup.type }}
+              </h4>
+              <ul class="tags">
+                <li
+                  class="tag"
+                  :key="link.id"
+                  v-for="link in linkGroup.links"
+                  @click="onSelectLink(link)"
+                >
+                  {{ link.name }}
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <build-filter-modal
+      :active="modals.buildFilter"
+      @confirm="confirmBuildFilter"
+      @cancel="modals.buildFilter = false"
+      v-if="isCurrentViewConcept"
+    />
 
     <view-playlist-modal
       :active="modals.playlist"
@@ -679,11 +790,6 @@
 
 <script>
 import { mapGetters, mapActions } from 'vuex'
-import { domMixin } from '@/components/mixins/dom'
-import { intersection } from '@/lib/array'
-import { sortPeople } from '@/lib/sorting'
-import preferences from '@/lib/preferences'
-import func from '@/lib/func'
 
 import {
   AlertCircleIcon,
@@ -692,24 +798,41 @@ import {
   EyeIcon,
   FilmIcon,
   ImageIcon,
+  LinkIcon,
   PlayCircleIcon,
   TrashIcon,
   UserIcon
 } from 'vue-feather-icons'
+
+import { intersection } from '@/lib/array'
+import { sortPeople } from '@/lib/sorting'
+import func from '@/lib/func'
+
+import BuildFilterModal from '@/components/modals/BuildFilterModal'
+import ButtonSimple from '@/components/widgets/ButtonSimple'
 import ComboboxModel from '@/components/widgets/ComboboxModel'
 import ComboboxStatus from '@/components/widgets/ComboboxStatus'
 import ComboboxStyled from '@/components/widgets/ComboboxStyled'
 import DeleteEntities from '@/components/tops/actions/DeleteEntities'
 import PeopleField from '@/components/widgets/PeopleField'
+import SearchField from '@/components/widgets/SearchField'
 import Spinner from '@/components/widgets/Spinner'
 import ViewPlaylistModal from '@/components/modals/ViewPlaylistModal'
 
 export default {
   name: 'action-panel',
-  mixins: [domMixin],
+
+  props: {
+    isSetFrameThumbnailLoading: {
+      type: Boolean,
+      default: false
+    }
+  },
 
   components: {
     AlertCircleIcon,
+    BuildFilterModal,
+    ButtonSimple,
     CheckSquareIcon,
     ComboboxModel,
     ComboboxStatus,
@@ -719,8 +842,10 @@ export default {
     EyeIcon,
     FilmIcon,
     ImageIcon,
+    LinkIcon,
     PeopleField,
     PlayCircleIcon,
+    SearchField,
     Spinner,
     UserIcon,
     TrashIcon,
@@ -741,11 +866,8 @@ export default {
       taskStatusId: '',
       statusComment: '',
       modals: {
+        buildFilter: false,
         playlist: false
-      },
-      position: {
-        top: 10,
-        left: 640
       },
       priorityOptions: [
         {
@@ -770,17 +892,20 @@ export default {
         assetDeletion: false,
         changePriority: false,
         changeStatus: false,
+        conceptDeletion: false,
         editDeletion: false,
         episodeDeletion: false,
         taskCreation: false,
         taskDeletion: false,
         setThumbnails: false,
         shotDeletion: false,
+        links: false,
         tasksSubscription: false
       },
       errors: {
         assetDeletion: false,
         taskDeletion: false,
+        conceptDeletion: false,
         editDeletion: false,
         episodeDeletion: false,
         shotDeletion: false
@@ -791,17 +916,10 @@ export default {
   mounted() {
     this.customAction = this.defaultCustomAction
     this.setCurrentTeam()
-    this.resetPosition()
-    window.removeEventListener('mousemove', this.doDrag)
-    window.removeEventListener('mouseup', this.stopDrag)
-    window.removeEventListener('beforeunload', this.setPositionPreference)
-    window.addEventListener('mousemove', this.doDrag)
-    window.addEventListener('mouseup', this.stopDrag)
-    window.addEventListener('beforeunload', this.setPositionPreference)
   },
 
   beforeDestroy() {
-    this.setPositionPreference()
+    window.removeEventListener('keydown', this.onKeyDown)
   },
 
   computed: {
@@ -809,6 +927,7 @@ export default {
       'allCustomActions',
       'assetMap',
       'assetCustomActions',
+      'assetsByType',
       'currentProduction',
       'getPersonOptions',
       'isCurrentUserArtist',
@@ -822,6 +941,7 @@ export default {
       'personMap',
       'productionMap',
       'selectedAssets',
+      'selectedConcepts',
       'selectedEdits',
       'selectedShots',
       'selectedTasks',
@@ -846,9 +966,17 @@ export default {
 
     currentEntityType() {
       if (this.isCurrentViewAsset) return 'asset'
-      else if (this.isCurrentViewShot) return 'shot'
-      else if (this.isCurrentViewEdit) return 'edit'
+      if (this.isCurrentViewShot) return 'shot'
+      if (this.isCurrentViewEdit) return 'edit'
       return 'episode'
+    },
+
+    currentConcept() {
+      return this.selectedConcepts.values().next().value
+    },
+
+    conceptLinkedEntities() {
+      return this.getLinkedEntities(this.currentConcept)
     },
 
     defaultCustomAction() {
@@ -871,6 +999,16 @@ export default {
       )
     },
 
+    isAssigned() {
+      if (!this.isCurrentUserArtist) return
+      if (this.nbSelectedTasks === 0) return
+      const selectedTasks = Array.from(this.selectedTasks.values())
+      const isAssigned = selectedTasks.some(task => {
+        return task.assignees.includes(this.user.id)
+      })
+      return isAssigned
+    },
+
     nbSelectedAssets() {
       return this.selectedAssets.size
     },
@@ -883,55 +1021,81 @@ export default {
       return this.selectedEdits.size
     },
 
+    nbSelectedConcepts() {
+      return this.selectedConcepts.size
+    },
+
     isHidden() {
       return (
         (this.nbSelectedTasks === 0 &&
           this.nbSelectedValidations === 0 &&
           this.nbSelectedAssets === 0 &&
           this.nbSelectedShots === 0 &&
-          this.nbSelectedEdits === 0) ||
+          this.nbSelectedEdits === 0 &&
+          this.nbSelectedConcepts === 0) ||
         !(
           this.isCurrentViewAsset ||
           this.isCurrentViewTodos ||
           this.isCurrentViewShot ||
           this.isCurrentViewEpisode ||
           this.isCurrentViewSequence ||
-          this.isCurrentViewEdit
+          this.isCurrentViewEdit ||
+          this.isCurrentViewConcept
         )
       )
     },
 
+    isConceptPublisher() {
+      return this.currentConcept?.created_by === this.user.id
+    },
+
+    isCurrentViewSingleEntity() {
+      return [
+        'asset',
+        'shot',
+        'edit',
+        'episode',
+        'sequence',
+        'episode-asset',
+        'episode-shot',
+        'episode-edit',
+        'episode-sequence'
+      ].includes(this.$route.name)
+    },
+
     isCurrentViewAsset() {
-      return (
-        this.$route.path.indexOf('asset') > 0 && !this.$route.params.asset_id
-      )
+      return this.$route.path.includes('asset') && !this.$route.params.shot_id
     },
 
     isCurrentViewShot() {
-      return this.$route.path.indexOf('shot') > 0 && !this.$route.params.shot_id
+      return this.$route.path.includes('shot') && !this.$route.params.shot_id
     },
 
     isCurrentViewEdit() {
-      return this.$route.path.indexOf('edit') > 0 && !this.$route.params.edit_id
+      return this.$route.path.includes('edit') && !this.$route.params.edit_id
+    },
+
+    isCurrentViewConcept() {
+      return this.$route.path.includes('concept')
     },
 
     isCurrentViewTodos() {
       return (
-        this.$route.path.indexOf('todos') > 0 ||
-        this.$route.path.indexOf('people/') > 0
+        this.$route.path.includes('my-tasks') ||
+        this.$route.path.includes('people/')
       )
     },
 
     isCurrentViewPerson() {
-      return this.$route.path.indexOf('people/') > 0
+      return this.$route.path.includes('people/')
     },
 
     isCurrentViewPersonTasks() {
-      return this.$route.path.indexOf('todos') > 0
+      return this.$route.path.includes('todos')
     },
 
     isCurrentViewTaskType() {
-      return this.$route.path.indexOf('task-type') > 0
+      return this.$route.path.includes('task-type')
     },
 
     isCurrentViewEntity() {
@@ -950,7 +1114,7 @@ export default {
           this.isCurrentViewAsset ||
           this.isCurrentViewShot ||
           this.isCurrentViewEdit
-        ) && this.$route.path.indexOf('episodes') > 0
+        ) && this.$route.path.includes('episodes')
       )
     },
 
@@ -960,7 +1124,7 @@ export default {
           this.isCurrentViewAsset ||
           this.isCurrentViewShot ||
           this.isCurrentViewEdit
-        ) && this.$route.path.indexOf('sequences') > 0
+        ) && this.$route.path.includes('sequences')
       )
     },
 
@@ -975,11 +1139,15 @@ export default {
     isInDepartment() {
       return this.selectedTaskIds.every(taskId => {
         const task = this.taskMap.get(taskId)
-        const taskType = this.taskTypeMap.get(task.task_type_id)
-        return (
-          taskType.department_id &&
-          this.user.departments.includes(taskType.department_id)
-        )
+        if (task) {
+          const taskType = this.taskTypeMap.get(task.task_type_id)
+          return (
+            taskType.department_id &&
+            this.user.departments.includes(taskType.department_id)
+          )
+        } else {
+          return true // We are in the artist todolist.
+        }
       })
     },
 
@@ -992,36 +1160,71 @@ export default {
 
     storagePrefix() {
       let prefix = 'todos-'
-      if (this.isCurrentViewAsset || this.isCurrentViewShot) {
+      if (
+        this.isCurrentViewAsset ||
+        this.isCurrentViewShot ||
+        this.isCurrentViewEdit
+      ) {
         prefix = 'entities-'
       }
+      if (this.isCurrentViewConcept) prefix = 'concepts-'
       if (this.isCurrentViewTaskType) prefix = 'tasks-'
       return prefix
+    },
+
+    availableLinksByType() {
+      const assetGroups = [...this.assetsByType]
+      const result = assetGroups.map(assets => {
+        if (!assets.length) return
+        return {
+          type: assets[0].asset_type_name,
+          links: assets
+            .map(asset => ({
+              id: asset.id,
+              name: asset.name
+            }))
+            .filter(asset => {
+              return !this.conceptLinkedEntities.some(e => e.id === asset.id)
+            })
+        }
+      })
+      return result
     }
   },
 
   methods: {
     ...mapActions([
       'assignSelectedTasks',
+      'changeSelectedTaskStatus',
+      'changeSelectedPriorities',
       'clearSelectedAssets',
       'clearSelectedShots',
       'clearSelectedEdits',
+      'clearSelectedConcepts',
+      'clearSelectedTasks',
       'createSelectedTasks',
       'deleteSelectedAssets',
       'deleteSelectedShots',
       'deleteSelectedTasks',
       'deleteSelectedEdits',
       'deleteSelectedEpisodes',
-      'changeSelectedTaskStatus',
-      'changeSelectedPriorities',
-      'clearSelectedTasks',
+      'deleteSelectedConcepts',
+      'editConcept',
+      'loadAssets',
       'postCustomAction',
+      'setAssetSearch',
       'setLastTaskPreview',
       'subscribeToTask',
       'unassignPersonFromTask',
       'unassignSelectedTasks',
       'unsubscribeFromTask'
     ]),
+
+    getLinkedEntities(concept) {
+      return concept.entity_concept_links
+        .map(id => this.assetMap.get(id))
+        .filter(Boolean)
+    },
 
     confirmTaskStatusChange() {
       this.loading.changeStatus = true
@@ -1096,14 +1299,13 @@ export default {
     },
 
     confirmTaskCreation() {
-      const type =
-        this.$route.path.indexOf('shots') > 0
-          ? 'shots'
-          : this.$route.path.indexOf('assets') > 0
+      const type = this.$route.path.includes('shots')
+        ? 'shots'
+        : this.$route.path.includes('assets')
           ? 'assets'
-          : this.$route.path.indexOf('edits') > 0
-          ? 'edits'
-          : 'episodes'
+          : this.$route.path.includes('edits')
+            ? 'edits'
+            : 'episodes'
       this.loading.taskCreation = true
       this.createSelectedTasks({
         type,
@@ -1119,7 +1321,6 @@ export default {
     },
 
     confirmTaskDeletion() {
-      if (this.$options.dragging) return
       this.loading.taskDeletion = true
       this.errors.taskDeletion = false
       this.deleteSelectedTasks()
@@ -1134,7 +1335,6 @@ export default {
     },
 
     confirmAssetDeletion() {
-      if (this.$options.dragging) return
       this.loading.deleteAsset = true
       this.errors.deleteAsset = false
       this.deleteSelectedAssets()
@@ -1150,7 +1350,6 @@ export default {
     },
 
     confirmShotDeletion() {
-      if (this.$options.dragging) return
       this.loading.deleteShot = true
       this.errors.deleteShot = false
       this.deleteSelectedShots()
@@ -1166,7 +1365,6 @@ export default {
     },
 
     confirmEditDeletion() {
-      if (this.$options.dragging) return
       this.loading.deleteEdit = true
       this.errors.deleteEdit = false
       this.deleteSelectedEdits()
@@ -1178,6 +1376,21 @@ export default {
           console.error(err)
           this.loading.deleteEdit = false
           this.errors.deleteEdit = true
+        })
+    },
+
+    confirmConceptDeletion() {
+      this.loading.deleteConcept = true
+      this.errors.deleteConcept = false
+      this.deleteSelectedConcepts()
+        .then(() => {
+          this.loading.deleteConcept = false
+          this.clearSelectedConcepts()
+        })
+        .catch(err => {
+          console.error(err)
+          this.loading.deleteConcept = false
+          this.errors.deleteConcept = true
         })
     },
 
@@ -1229,7 +1442,6 @@ export default {
     confirmSetThumbnailsFromTasks() {
       this.loading.setThumbnails = true
       if (this.nbSelectedTasks === 1) {
-        const task = this.selectedTasks.values().next().value
         this.$emit('set-frame-thumbnail', this.isUseCurrentFrame)
         this.loading.setThumbnails = false
       } else {
@@ -1296,7 +1508,6 @@ export default {
     },
 
     selectBar(barName) {
-      if (this.$options.dragging) return
       localStorage.setItem(`${this.storagePrefix}-selected-bar`, barName, {
         expires: '1M'
       })
@@ -1322,28 +1533,36 @@ export default {
           this.selectedBar = 'delete-edits'
           return
         }
-        if (this.nbSelectedTasks === 1) {
-          this.selectedBar = ''
+        if (this.isCurrentViewConcept && this.nbSelectedConcepts > 1) {
+          this.selectedBar = 'delete-concepts'
           return
         }
+        if (this.nbSelectedTasks === 1) {
+          this.selectedBar = ''
+        }
 
-        const prefix = this.storagePrefix
-        const lastSelection = localStorage.getItem(`${prefix}-selected-bar`)
+        const lastSelection = localStorage.getItem(
+          `${this.storagePrefix}-selected-bar`
+        )
         if (lastSelection) {
           this.selectedBar = lastSelection
-        } else {
-          if (this.isCurrentViewAsset || this.isCurrentViewShot) {
-            this.selectedBar = 'change-status'
-          }
+        } else if (
+          this.isCurrentViewAsset ||
+          this.isCurrentViewShot ||
+          this.isCurrentViewEdit
+        ) {
+          this.selectedBar = 'change-status'
         }
       } else {
         window.removeEventListener('keydown', this.onKeyDown)
       }
     },
 
-    setAvailableStatus() {
-      if (this.selectedTasks.size === 0) this.availableTaskStatuses = []
-      else if (this.isCurrentViewTodos) {
+    setAvailableStatuses() {
+      let availableTaskStatuses
+      if (this.selectedTasks.size === 0) {
+        availableTaskStatuses = []
+      } else if (this.isCurrentViewTodos) {
         const productions = new Map()
         this.selectedTasks.forEach(task => {
           const project = this.productionMap.get(task.project_id)
@@ -1353,67 +1572,46 @@ export default {
           p => p.task_statuses
         )
         const availableStatus = new Set(intersection(statusLists))
-        this.availableTaskStatuses = this.taskStatusForCurrentUser.filter(
-          status => availableStatus.has(status.id)
+        availableTaskStatuses = this.taskStatusForCurrentUser.filter(status =>
+          availableStatus.has(status.id)
         )
       } else {
-        this.availableTaskStatuses = this.taskStatusForCurrentUser
+        availableTaskStatuses = this.taskStatusForCurrentUser
       }
+      availableTaskStatuses = availableTaskStatuses.filter(
+        status => Boolean(status.for_concept) === this.isCurrentViewConcept
+      )
+      this.availableTaskStatuses = availableTaskStatuses
     },
 
-    startDrag(event) {
-      // if (event.target.nodeName === 'svg') return
-      this.$options.startX = event.x
-      this.$options.startY = event.y
-      this.$options.startLeft = parseInt(this.position.left)
-      this.$options.startTop = parseInt(this.position.top)
-      this.$options.dragging = true
-    },
-
-    doDrag(event) {
-      if (this.$options.dragging) {
-        let newX = this.$options.startLeft - (this.$options.startX - event.x)
-        const barHeight = this.$refs['action-bar'].offsetHeight
-        const barWidth = this.$refs['action-bar'].offsetWidth
-        if (newX < 0) newX = 0
-        if (newX + barWidth > window.innerWidth) {
-          newX = window.innerWidth - barWidth
-        }
-        let newY = this.$options.startTop - (this.$options.startY - event.y)
-        if (newY < 65) newY = 65
-        if (newY + barHeight > window.innerHeight) {
-          newY = window.innerHeight - barHeight
-        }
-        this.position.left = newX
-        this.position.top = newY
+    onRemoveLink(link) {
+      const concept = {
+        id: this.currentConcept.id,
+        entity_concept_links: this.currentConcept.entity_concept_links.filter(
+          id => id !== link.id
+        )
       }
+      this.editConcept(concept)
     },
 
-    stopDrag(event) {
-      this.pauseEvent(event)
-      this.$options.dragging = false
+    confirmBuildFilter(query) {
+      this.modals.buildFilter = false
+      this.$refs['entity-search-field'].setValue(query)
+      this.onEntitySearchChange(query)
     },
 
-    resetPosition() {
-      let newX = parseInt(preferences.getPreference('topbar:position-x')) || 0
-      let newY = parseInt(preferences.getPreference('topbar:position-y')) || 0
-      const barHeight = 148
-      const barWidth = 460
-      if (newX < 0) newX = 0
-      if (newX + barWidth > window.innerWidth) {
-        newX = window.innerWidth - barWidth
+    onEntitySearchChange(searchQuery) {
+      this.setAssetSearch(searchQuery)
+    },
+
+    onSelectLink(link) {
+      const concept = {
+        id: this.currentConcept.id,
+        entity_concept_links: [
+          ...this.currentConcept.entity_concept_links
+        ].concat(link.id)
       }
-      if (newY < 65) newY = 65
-      if (newY + barHeight > window.innerHeight) {
-        newY = window.innerHeight - barHeight
-      }
-      this.position.left = newX
-      this.position.top = newY
-    },
-
-    setPositionPreference() {
-      preferences.setPreference('topbar:position-x', this.position.left)
-      preferences.setPreference('topbar:position-y', this.position.top)
+      this.editConcept(concept)
     }
   },
 
@@ -1430,22 +1628,16 @@ export default {
 
     nbSelectedEdits() {
       this.autoChooseSelectBar()
-      if (this.nbSelectedShots > 0) this.clearSelectedTasks()
+      if (this.nbSelectedEdits > 0) this.clearSelectedTasks()
+    },
+
+    nbSelectedConcepts() {
+      this.autoChooseSelectBar()
+      if (this.nbSelectedConcepts > 1) this.clearSelectedTasks()
     },
 
     isHidden() {
       this.autoChooseSelectBar()
-      if (this.isHidden) {
-        window.removeEventListener('mousemove', this.doDrag)
-        window.removeEventListener('mouseup', this.stopDrag)
-        window.removeEventListener('beforeunload', this.setPositionPreference)
-        this.setPositionPreference()
-      } else {
-        window.addEventListener('mousemove', this.doDrag)
-        window.addEventListener('mouseup', this.stopDrag)
-        window.addEventListener('beforeunload', this.setPositionPreference)
-        this.resetPosition()
-      }
     },
 
     nbSelectedTasks() {
@@ -1453,7 +1645,7 @@ export default {
       if (this.nbSelectedTasks > 0) {
         let isShotSelected = false
         let isAssetSelected = false
-        this.setAvailableStatus()
+        this.setAvailableStatuses()
         this.selectedTaskIds.forEach(taskId => {
           const task = this.selectedTasks.get(taskId)
           if (task && task.sequence_name) {
@@ -1489,6 +1681,10 @@ export default {
           this.selectedBar === this.lastSelectedBar
         }
       }
+    },
+
+    selectedTasks() {
+      this.selectedTaskIds = Array.from(this.selectedTasks.keys())
     },
 
     currentProduction() {
@@ -1540,6 +1736,12 @@ export default {
       border-bottom: 1px solid $dark-grey-light;
     }
   }
+
+  .concept-links {
+    background: $dark-grey-light;
+    border: 1px solid #222;
+    box-shadow: 0 0 6px #222;
+  }
 }
 
 .action-topbar {
@@ -1570,10 +1772,8 @@ div.assignation {
 .menu {
   background: var(--background);
   color: $grey;
-  cursor: grab;
   padding-top: 0.7em;
   border-bottom: 1px solid $light-grey-light;
-  z-index: 200;
   background: #fcfcff;
 }
 
@@ -1601,11 +1801,6 @@ div.assignation {
 .action-bar {
   padding: 0.5em 0.5em;
   border-bottom: 1px solid $light-grey-light;
-}
-
-.minimized {
-  .menu {
-  }
 }
 
 .button {
@@ -1637,34 +1832,16 @@ div.assignation {
   width: 100%;
 }
 
-.handle {
-  cursor: grab;
-  padding-left: 0.5em;
-  padding-right: 0em;
-  .handle-icon:last-child {
-    margin-left: -14px;
-  }
-
-  .handle-icon:last-child {
-    margin-left: -32px;
-  }
-}
-
 .is-link {
   color: var(--text);
 }
 
-.close-bar {
-  cursor: pointer;
-  margin-right: 0.5em;
-  margin-top: -1.5em;
-  svg {
-    width: 16px;
-  }
-}
-
 .change-status-item {
   margin-right: 0.5em;
+}
+
+.assignation-field ::v-deep .v-autocomplete {
+  z-index: 501; // +1 relative to the z-index of canvas-wrapper
 }
 
 .status-item {
@@ -1678,6 +1855,7 @@ div.assignation {
   height: 100%;
   margin-left: 1em;
   margin-top: -1em;
+  text-transform: uppercase;
 
   &:hover {
     border: 2px solid var(--text);
@@ -1697,5 +1875,84 @@ div.assignation {
 .spinner {
   margin: auto;
   margin-top: 0.5em;
+}
+
+.tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-left: 0;
+  min-height: 21px;
+  font-weight: 500;
+  letter-spacing: 1px;
+
+  .tag {
+    cursor: pointer;
+    display: inline-flex;
+    gap: 1em;
+    border: 1px solid $light-green;
+    transition: transform 0.1s linear;
+
+    .action {
+      border-radius: 50%;
+      display: none;
+      height: 14px;
+      width: 14px;
+      line-height: 8px;
+    }
+
+    &:hover {
+      transform: scale(1.1);
+
+      .action {
+        display: inline-block;
+      }
+    }
+  }
+}
+
+.concept-links {
+  overflow-y: auto;
+  padding: 1em;
+  background: $white;
+  border: 1px solid $white-grey;
+  box-shadow: 0 0 6px #e0e0e0;
+  border-radius: 1em;
+
+  .subtitle {
+    margin-top: 0;
+    border-bottom: 0;
+  }
+
+  .link-types {
+    list-style: none;
+    margin-left: 0;
+  }
+
+  .link-list {
+    height: 300px;
+    overflow-y: auto;
+  }
+
+  .link-type {
+    .subtitle {
+      text-transform: uppercase;
+      color: $grey;
+      border-bottom: 1px solid $light-grey;
+      font-size: 1.2em;
+      margin-top: 1em;
+      margin-bottom: 1em;
+    }
+
+    .tag {
+      border-color: $light-grey;
+      cursor: pointer;
+      transition: transform 0.1s linear;
+
+      &:hover {
+        transform: scale(1.1);
+      }
+    }
+  }
 }
 </style>

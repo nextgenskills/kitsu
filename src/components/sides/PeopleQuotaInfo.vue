@@ -7,7 +7,7 @@
     </div>
 
     <div class="flexrow">
-      <people-avatar class="flexrow-item" :person="person" :no-cache="true" />
+      <people-avatar class="flexrow-item" :person="person" :is-lazy="false" />
       <page-title class="flexrow-item" :text="person.full_name" />
     </div>
     <div class="info-date" v-if="isMonthInfo">{{ monthString }} {{ year }}</div>
@@ -41,7 +41,7 @@ import QuotaShotList from '@/components/lists/QuotaShotList'
 import { monthToString } from '@/lib/time'
 
 export default {
-  name: 'shot-quota-info',
+  name: 'people-quota-info',
 
   components: {
     XIcon,
@@ -101,7 +101,7 @@ export default {
         .day('Monday')
         .year(this.year)
         .week(this.week)
-        .add('days', 6)
+        .add(6, 'days')
         .date()
     },
 

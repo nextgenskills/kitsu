@@ -24,7 +24,7 @@ export const fullScreenMixin = {
   methods: {
     isFullScreen() {
       return !!(
-        document.fullScreen ||
+        document.fullscreen ||
         document.webkitIsFullScreen ||
         document.mozFullScreen ||
         document.msFullscreenElement ||
@@ -34,7 +34,7 @@ export const fullScreenMixin = {
 
     documentExitFullScreen() {
       if (document.exitFullscreen) {
-        document.exitFullscreen()
+        return document.exitFullscreen()
       } else if (document.mozCancelFullScreen) {
         document.mozCancelFullScreen()
       } else if (document.webkitCancelFullScreen) {
@@ -46,7 +46,7 @@ export const fullScreenMixin = {
 
     documentSetFullScreen(element) {
       if (element.requestFullscreen) {
-        element.requestFullscreen()
+        return element.requestFullscreen()
       } else if (element.mozRequestFullScreen) {
         element.mozRequestFullScreen()
       } else if (element.webkitRequestFullScreen) {

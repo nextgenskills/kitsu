@@ -74,7 +74,9 @@
                 renderComment(
                   comment.text,
                   comment.mentions,
+                  comment.department_mentions || [],
                   personMap,
+                  departmentMap,
                   uniqueClassName
                 )
               "
@@ -87,6 +89,7 @@
               @remove-task="removeTask"
               @keyup.native="emitChangeEvent($event)"
               @emit-change="emitChangeEvent"
+              @time-code-clicked="onChecklistTimecodeClicked"
               :disabled="true"
               v-if="checklist.length > 0"
             />
@@ -144,9 +147,9 @@
                     </strong>
                     <span
                       class="flexrow-item reply-date"
-                      :title="replyDate(replyComment.date)"
+                      :title="replyFullDate(replyComment.date)"
                     >
-                      {{ renderDate(replyComment.date) }}
+                      {{ replyShortDate(replyComment.date) }}
                     </span>
                     <span class="filler"> </span>
                     <span
@@ -161,18 +164,66 @@
                     </span>
                   </div>
                   <p
-                    v-html="renderComment(replyComment.text, [], personMap, '')"
+                    v-html="
+                      renderComment(
+                        replyComment.text,
+                        replyComment.mentions || [],
+                        replyComment.department_mentions || [],
+                        personMap,
+                        departmentMap,
+                        uniqueClassName
+                      )
+                    "
                     class="comment-text"
                   ></p>
                 </div>
               </div>
-              <textarea
-                ref="reply"
-                class="reply"
-                @keyup.ctrl.enter="onReplyClicked"
-                v-model="replyText"
-                v-show="showReply"
-              />
+              <at-ta
+                :members="atOptions"
+                name-key="full_name"
+                :limit="2"
+                @input="onAtTextChanged"
+              >
+                <template slot="item" slot-scope="team">
+                  <template v-if="team.item.isTime"> ⏱️ frame </template>
+                  <template v-else-if="team.item.isDepartment">
+                    <span
+                      class="mr05"
+                      :style="{
+                        background: team.item.color,
+                        width: '10px',
+                        height: '10px',
+                        'border-radius': '50%'
+                      }"
+                    >
+                      &nbsp;
+                    </span>
+                    {{ team.item.full_name }}
+                  </template>
+                  <template v-else>
+                    <div class="flexrow">
+                      <people-avatar
+                        class="flexrow-item"
+                        :person="team.item"
+                        :size="20"
+                        :font-size="11"
+                        :is-lazy="false"
+                        :is-link="false"
+                      />
+                      <span class="flexrow-item">
+                        {{ team.item.full_name }}
+                      </span>
+                    </div>
+                  </template>
+                </template>
+                <textarea
+                  ref="reply"
+                  class="reply"
+                  @keyup.ctrl.enter="onReplyClicked"
+                  v-model="replyText"
+                  v-show="showReply"
+                />
+              </at-ta>
               <div class="has-text-right">
                 <button-simple
                   class="reply-button"
@@ -187,7 +238,7 @@
             <div
               class="flexrow"
               :title="isLikedBy"
-              v-if="comment.text.length > 0"
+              v-if="comment.text.length > 0 || comment.previews.length > 0"
             >
               <button
                 :class="{
@@ -219,7 +270,7 @@
       </div>
       <div
         class="flexrow content-wrapper preview-info"
-        v-if="comment.previews.length > 0"
+        v-if="comment.previews.length > 0 && !isConcept"
       >
         <router-link
           class="flexrow-item round-name revision"
@@ -287,15 +338,17 @@
 </template>
 
 <script>
+import AtTa from 'vue-at/dist/vue-at-textarea'
 import moment from 'moment'
 import { mapActions, mapGetters } from 'vuex'
 import { remove } from '@/lib/models'
-import { renderComment } from '@/lib/render'
+import { renderComment, replaceTimeWithTimecode } from '@/lib/render'
 import { sortByName } from '@/lib/sorting'
 import { formatDate, parseDate } from '@/lib/time'
 import colors from '@/lib/colors'
 import files from '@/lib/files'
 import { pluralizeEntityType } from '@/lib/path'
+import { domMixin } from '@/components/mixins/dom'
 
 import {
   ChevronDownIcon,
@@ -312,7 +365,9 @@ import ValidationTag from '@/components/widgets/ValidationTag'
 
 export default {
   name: 'comment',
+  mixins: [domMixin],
   components: {
+    AtTa,
     ButtonSimple,
     Checklist,
     ChevronDownIcon,
@@ -327,6 +382,7 @@ export default {
 
   data() {
     return {
+      atOptions: [],
       checklist: [],
       isReplyLoading: false,
       replyText: '',
@@ -340,6 +396,10 @@ export default {
       type: Object,
       default: () => {}
     },
+    team: {
+      type: Array,
+      default: () => []
+    },
     task: {
       type: Object,
       default: null
@@ -351,6 +411,10 @@ export default {
     editable: {
       type: Boolean,
       default: false
+    },
+    frame: {
+      type: Number,
+      default: 0
     },
     light: {
       type: Boolean,
@@ -367,6 +431,14 @@ export default {
     isChange: {
       type: Boolean,
       default: false
+    },
+    fps: {
+      type: Number,
+      default: 25
+    },
+    revision: {
+      type: Number,
+      default: 1
     }
   },
 
@@ -396,15 +468,21 @@ export default {
   computed: {
     ...mapGetters([
       'currentProduction',
+      'departmentMap',
       'isCurrentUserAdmin',
       'isCurrentUserClient',
       'isCurrentUserManager',
       'isDarkTheme',
       'user',
       'personMap',
+      'productionDepartmentIds',
       'taskTypeMap',
       'taskStatusMap'
     ]),
+
+    isConcept() {
+      return this.$route.path.includes('concept')
+    },
 
     isEmpty() {
       return (
@@ -515,7 +593,8 @@ export default {
     },
 
     boxShadowStyle() {
-      return `0 0 3px 2px ${this.comment.task_status.color}1F`
+      const status = this.comment.task_status
+      return `0 0 3px 2px ${status.color}1F`
     },
 
     statusColor() {
@@ -543,8 +622,14 @@ export default {
       return formatDate(date)
     },
 
-    replyDate(date) {
-      return moment(date).tz(this.user.timezone).format('YYYY-MM-DD HH:mm:ss')
+    replyFullDate(date) {
+      return moment(parseDate(date))
+        .tz(this.user.timezone)
+        .format('YYYY-MM-DD HH:mm:ss')
+    },
+
+    replyShortDate(date) {
+      return this.renderDate(parseDate(date))
     },
 
     renderDate(date) {
@@ -615,7 +700,24 @@ export default {
     },
 
     timeCodeClicked(event) {
-      this.$emit('time-code-clicked', event.target.dataset)
+      const data = { ...event.target.dataset }
+      data.frame = data.frame - 1
+      this.pauseEvent(event)
+      this.$emit('time-code-clicked', data)
+    },
+
+    onChecklistTimecodeClicked(data) {
+      this.$emit('time-code-clicked', {
+        versionRevision: data.revision,
+        frame: data.frame - 1
+      })
+    },
+
+    setFrame(data) {
+      this.$emit('time-code-clicked', {
+        versionRevision: data.revision,
+        frame: data.frame - 1
+      })
     },
 
     getPreviewValidationStyle(previewFile) {
@@ -667,6 +769,17 @@ export default {
           this.isReplyLoading = false
         })
         .catch(console.error)
+    },
+
+    onAtTextChanged(input) {
+      if (input.includes('@frame')) {
+        this.replyText = replaceTimeWithTimecode(
+          input,
+          this.revision,
+          this.frame + 1,
+          this.fps
+        )
+      }
     }
   },
 
@@ -682,6 +795,35 @@ export default {
     checklist() {
       if (!this.$options.silent) {
         this.emitChangeEvent()
+      }
+    },
+
+    team: {
+      deep: true,
+      immediate: true,
+      handler() {
+        if (this.isCurrentUserClient) {
+          this.atOptions = this.team.filter(person =>
+            ['admin', 'manager', 'supervisor', 'client'].includes(person.role)
+          )
+        } else {
+          this.atOptions = [...this.team]
+        }
+        this.atOptions = this.atOptions.concat(
+          this.productionDepartmentIds.map(departmentId => {
+            const department = this.departmentMap.get(departmentId)
+            return {
+              isDepartment: true,
+              full_name: department.name,
+              color: department.color,
+              id: departmentId
+            }
+          })
+        )
+        this.atOptions.push({
+          isTime: true,
+          full_name: 'frame'
+        })
       }
     }
   }
@@ -872,6 +1014,7 @@ article.comment {
 .date {
   font-size: 0.8em;
   margin-right: 0.5em;
+  white-space: nowrap;
 }
 
 .preview-info {
@@ -904,12 +1047,15 @@ p {
 
 .congrats-picture {
   max-width: 300px;
+  max-height: 300px;
 }
 
 .reply-button {
+  border-radius: 5px;
   color: var(--text);
   cursor: pointer;
   font-size: 0.8em;
+  padding: 0;
   padding-right: 0.5em;
   text-align: right;
   width: 60px;
@@ -955,13 +1101,6 @@ textarea.reply {
     font-size: 0.8em;
     color: var(--text);
   }
-}
-
-.reply-button {
-  border-radius: 5px;
-  color: var(--text);
-  padding: 0;
-  text-transform: lowercase;
 }
 
 .reply-delete {

@@ -91,7 +91,11 @@
         :value="getMetadataFieldValue({ field_name: 'frame_in' }, entity)"
         @input="
           event =>
-            onMetadataFieldChanged(entity, { field_name: 'frame_in' }, event)
+            onMetadataFieldChanged(
+              entity,
+              { field_name: 'frame_in', data_type: 'number' },
+              event
+            )
         "
         v-if="isCurrentUserManager"
       />
@@ -113,7 +117,11 @@
         :value="getMetadataFieldValue({ field_name: 'frame_out' }, entity)"
         @input="
           event =>
-            onMetadataFieldChanged(entity, { field_name: 'frame_out' }, event)
+            onMetadataFieldChanged(
+              entity,
+              { field_name: 'frame_out', data_type: 'number' },
+              event
+            )
         "
         v-if="isCurrentUserManager"
       />
@@ -330,10 +338,12 @@ export default {
   computed: {
     ...mapGetters([
       'isCurrentUserManager',
+      'isCurrentUserSupervisor',
       'isFrameIn',
       'isFrameOut',
       'isFrames',
-      'isShowInfosBreakdown'
+      'isShowInfosBreakdown',
+      'user'
     ]),
 
     chunks() {
@@ -344,7 +354,10 @@ export default {
     assetsByAssetTypesMap() {
       const assetsByAssetTypes = {}
       this.assets.forEach(assetTypeAssets => {
-        assetsByAssetTypes[assetTypeAssets[0].asset_type_name] = assetTypeAssets
+        if (assetTypeAssets[0]) {
+          assetsByAssetTypes[assetTypeAssets[0].asset_type_name] =
+            assetTypeAssets
+        }
       })
       return assetsByAssetTypes
     }

@@ -13,15 +13,19 @@
         :style="{ padding: '0px 0px' }"
         v-for="department in currentDepartments"
       />
-      <span class="flexrow-item descriptor-name">
+      <span
+        class="flexrow-item ellipsis descriptor-name"
+        :title="descriptor.name"
+      >
         {{ descriptor.name }}
       </span>
+
       <span
         class="metadata-menu-button header-icon"
         @click="$emit('show-metadata-header-menu', $event)"
         v-if="!noMenu"
       >
-        <chevron-down-icon :size="'12'" />
+        <chevron-down-icon size="12" />
       </span>
     </div>
   </th>
@@ -34,7 +38,7 @@ import { mapGetters } from 'vuex'
 import DepartmentName from '@/components/widgets/DepartmentName'
 
 export default {
-  name: 'MetadataHeader',
+  name: 'metadata-header',
   props: {
     descriptor: Object,
     isStick: {

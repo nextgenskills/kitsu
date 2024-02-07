@@ -231,6 +231,7 @@
               class="metadata-descriptor datatable-row-header"
               :title="sequence.data ? sequence.data[descriptor.field_name] : ''"
               :style="{
+                'z-index': 1000 - i, // Need for combo to be above the next cell
                 left: offsets['editor-' + j]
                   ? `${offsets['editor-' + j]}px`
                   : '0'
@@ -374,7 +375,7 @@
 
     <div
       class="has-text-centered"
-      v-if="isEmptyList && isCurrentUserClient && !isLoading"
+      v-if="isEmptyList && !isCurrentUserClient && !isLoading"
     >
       <p class="info">
         <img src="../../assets/illustrations/empty_shot.png" />
@@ -521,8 +522,8 @@ export default {
 
     isEmptyList() {
       return (
-        this.displayedSequences.length &&
-        this.displayedSequences[0].length === 0 &&
+        this.displayedSequences &&
+        this.displayedSequences.length === 0 &&
         !this.isLoading &&
         !this.isError &&
         (!this.sequenceSearchText || this.sequenceSearchText.length === 0)
@@ -761,6 +762,7 @@ input[type='number'] {
 
 td.metadata-descriptor {
   height: 3.1rem;
+  max-width: 120px;
   padding: 0;
 }
 

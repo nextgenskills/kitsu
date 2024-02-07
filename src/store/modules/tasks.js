@@ -73,7 +73,6 @@ import {
   CLEAR_UPLOAD_PROGRESS,
   ADD_ATTACHMENT_TO_COMMENT,
   REMOVE_ATTACHMENT_FROM_COMMENT,
-  REMOVE_FIRST_PREVIEW_FILE_TO_UPLOAD,
   UPDATE_REVISION_PREVIEW_POSITION,
   RESET_ALL
 } from '@/store/mutation-types'
@@ -213,10 +212,10 @@ const actions = {
     })
   },
 
-  loadComment({ commit, state }, { commentId, callback }) {
+  loadComment({ commit }, { commentId }) {
     return tasksApi.getTaskComment({ id: commentId }).then(comment => {
       commit(NEW_TASK_COMMENT_END, { comment, taskId: comment.object_id })
-      return Promise.resolve(comment)
+      return comment
     })
   },
 
@@ -514,55 +513,96 @@ const actions = {
   },
 
   commentTaskWithPreview(
-    { commit, getters, state, dispatch },
+    { commit, state },
     { taskId, comment, revision, taskStatusId, form, attachment, checklist }
   ) {
     const data = { taskId, taskStatusId, comment, attachment, checklist }
+    const previewForms = [...state.previewForms]
     commit(ADD_PREVIEW_START)
     let newComment
     locks[taskId] = true
-    return tasksApi
-      .commentTask(data)
-      .then(comment => {
-        newComment = comment
-        const previewData = {
-          taskId,
-          commentId: newComment.id,
-          revision
-        }
-        return tasksApi.addPreview(previewData)
-      })
-      .then(preview => {
-        if (!form) form = state.previewForms[0]
-        const { request, promise } = tasksApi.uploadPreview(preview.id, form)
-        request.on('progress', e => {
-          commit(SET_UPLOAD_PROGRESS, {
-            previewId: preview.id,
-            percent: e.percent,
-            name: form.get('file').name
-          })
-        })
-        return promise
-      })
-      .then(preview => {
-        commit(NEW_TASK_COMMENT_END, { comment: newComment, taskId })
-        commit(ADD_PREVIEW_END, {
-          preview,
-          taskId,
-          commentId: newComment.id,
-          comment: newComment
-        })
-        if (state.previewForms.length > 1) {
-          commit(REMOVE_FIRST_PREVIEW_FILE_TO_UPLOAD)
-          dispatch('addCommentExtraPreview', {
+    return (
+      tasksApi
+        .commentTask(data)
+        // Create the comment entry.
+        .then(comment => {
+          newComment = comment
+          const previewData = {
             taskId,
             commentId: newComment.id,
-            previewId: preview.id
+            revision
+          }
+          return tasksApi.addPreview(previewData)
+        })
+        // Create the main preview entry.
+        .then(preview => {
+          if (!form) form = previewForms[0]
+          const { request, promise } = tasksApi.uploadPreview(preview.id, form)
+          request.on('progress', e => {
+            commit(SET_UPLOAD_PROGRESS, {
+              previewId: preview.id,
+              percent: e.percent,
+              name: form.get('file').name
+            })
           })
-        }
-        commit(CLEAR_UPLOAD_PROGRESS)
-        return Promise.resolve({ newComment, preview })
-      })
+          return promise
+        })
+        .then(preview => {
+          commit(ADD_PREVIEW_END, {
+            preview,
+            taskId,
+            commentId: newComment.id,
+            comment: newComment
+          })
+          // Create the remaining previews if there are some.
+          if (previewForms.length > 1) {
+            const addPreview = form => {
+              return tasksApi
+                .addExtraPreview(preview.id, taskId, newComment.id)
+                .then(extraPreview => {
+                  const { request, promise } = tasksApi.uploadPreview(
+                    extraPreview.id,
+                    form
+                  )
+                  request.on('progress', e => {
+                    commit(SET_UPLOAD_PROGRESS, {
+                      previewId: extraPreview.id,
+                      percent: e.percent,
+                      name: form.get('file').name
+                    })
+                  })
+                  return promise
+                })
+                .then(preview => {
+                  commit(ADD_PREVIEW_END, {
+                    preview,
+                    taskId,
+                    commentId: newComment.id,
+                    comment: newComment
+                  })
+                  return preview
+                })
+            }
+            const remainingPreviews = previewForms.slice(1)
+            // run promises in sequence
+            return remainingPreviews.reduce(
+              (accumulatorPromise, form) =>
+                accumulatorPromise.then(() => addPreview(form)),
+              Promise.resolve()
+            )
+          } else {
+            return preview
+          }
+        })
+        .then(preview => {
+          commit(NEW_TASK_COMMENT_END, { comment: newComment, taskId })
+          commit(CLEAR_UPLOAD_PROGRESS)
+          return { newComment, preview }
+        })
+        .finally(() => {
+          locks[taskId] = false
+        })
+    )
   },
 
   addCommentExtraPreview(
@@ -591,14 +631,15 @@ const actions = {
             commentId,
             comment
           })
-          return Promise.resolve(preview)
+          return preview
         })
     }
-    return state.previewForms.reduce((accumulatorPromise, form) => {
-      return accumulatorPromise.then(() => {
-        return addPreview(form)
-      })
-    }, Promise.resolve())
+    // run promises in sequence
+    return state.previewForms.reduce(
+      (accumulatorPromise, form) =>
+        accumulatorPromise.then(() => addPreview(form)),
+      Promise.resolve()
+    )
   },
 
   deleteTaskPreview({ commit, state }, { taskId, commentId, previewId }) {
@@ -656,7 +697,7 @@ const actions = {
       .catch(err => {
         console.error(err)
         alert(
-          'An error occured while saving your annotation, please wait 3s for another try.'
+          'An error occurred while saving your annotation, please wait 3s for another try.'
         )
       })
   },
@@ -672,8 +713,8 @@ const actions = {
     })
   },
 
-  assignSelectedTasks({ commit, state }, { personId, callback }) {
-    const selectedTaskIds = Array.from(state.selectedTasks.keys())
+  assignSelectedTasks({ commit, state }, { personId, taskIds, callback }) {
+    const selectedTaskIds = taskIds || Array.from(state.selectedTasks.keys())
     tasksApi.assignTasks(personId, selectedTaskIds, err => {
       if (!err) commit(ASSIGN_TASKS, { selectedTaskIds, personId })
       if (callback) callback(err)
@@ -750,34 +791,22 @@ const actions = {
   },
 
   saveTaskSearch({ commit, rootGetters }, { searchQuery, entityType }) {
-    const query = state.taskSearchQueries.find(
-      query => query.name === searchQuery
-    )
-    const production = rootGetters.currentProduction
-
-    if (!query) {
-      return peopleApi
-        .createFilter(
-          'task',
-          searchQuery,
-          searchQuery,
-          production.id,
-          entityType
-        )
-        .then(searchQuery => {
-          commit(SAVE_TASK_SEARCH_END, { searchQuery, production })
-          return Promise.resolve(searchQuery)
-        })
-    } else {
-      Promise.resolve()
+    if (state.taskSearchQueries.some(query => query.name === searchQuery)) {
+      return
     }
+    const production = rootGetters.currentProduction
+    return peopleApi
+      .createFilter('task', searchQuery, searchQuery, production.id, entityType)
+      .then(searchQuery => {
+        commit(SAVE_TASK_SEARCH_END, { searchQuery, production })
+        return searchQuery
+      })
   },
 
   removeTaskSearch({ commit, rootGetters }, searchQuery) {
     const production = rootGetters.currentProduction
     return peopleApi.removeFilter(searchQuery).then(() => {
       commit(REMOVE_TASK_SEARCH_END, { searchQuery, production })
-      return Promise.resolve(searchQuery)
     })
   },
 
@@ -806,10 +835,10 @@ const actions = {
     return tasksApi.pinComment(comment)
   },
 
-  refreshComment({ commit, state }, { taskId, commentId }) {
+  refreshComment({ commit }, { commentId }) {
     return tasksApi.getTaskComment({ id: commentId }).then(comment => {
       commit(UPDATE_COMMENT_REPLIES, comment)
-      return Promise.resolve(comment)
+      return comment
     })
   },
 
@@ -820,6 +849,10 @@ const actions = {
       payload.previewId,
       payload.newIndex
     )
+  },
+
+  getPersonsTasksDates({ commit }) {
+    return tasksApi.getPersonsTasksDates()
   }
 }
 
@@ -871,7 +904,7 @@ const mutations = {
         state.taskComments[task.id].length > 0 &&
         !locks[task.id]
       ) {
-        const comment = state.taskComments[task.id][0]
+        const comment = state.taskComments[task.id].find(c => !c.pinned)
         Object.assign(comment, {
           task_status_id: task.task_status_id,
           task_status: state.taskStatusMap.get(task.task_status_id)
@@ -886,9 +919,7 @@ const mutations = {
 
   [LOAD_TASK_COMMENTS_END](state, { taskId, comments }) {
     comments.forEach(comment => {
-      comment.person = personStore.helpers.addAdditionalInformation(
-        comment.person
-      )
+      comment.person = personStore.state.personMap.get(comment.person_id)
     })
     state.taskComments[taskId] = sortComments(comments)
     Vue.set(
@@ -903,10 +934,13 @@ const mutations = {
                 id: p.id,
                 annotations: p.annotations,
                 extension: p.extension,
+                width: p.width,
+                height: p.height,
                 task_id: p.task_id,
                 status: p.status,
                 revision: p.revision,
                 position: p.position,
+                duration: p.duration,
                 original_name: p.original_name
               }
               Vue.set(prev, 'status', p.status)
@@ -954,8 +988,13 @@ const mutations = {
     )
 
     if (!state.taskComments[taskId]) state.taskComments[taskId] = []
-    if (!state.taskComments[taskId].find(cmt => cmt.id === comment.id)) {
+    const commentIndex = state.taskComments[taskId].findIndex(
+      ({ id }) => id === comment.id
+    )
+    if (commentIndex < 0) {
       state.taskComments[taskId].unshift(comment)
+    } else {
+      state.taskComments[taskId].splice(commentIndex, 1, comment)
     }
     state.taskComments[taskId] = sortComments(state.taskComments[taskId])
     if (task) {
@@ -964,7 +1003,6 @@ const mutations = {
         last_comment: comment
       })
     }
-    locks[taskId] = false
   },
 
   [DELETE_TASK_END](state, task) {
@@ -1047,6 +1085,7 @@ const mutations = {
       position: preview.position,
       original_name: preview.original_name,
       extension: preview.extension,
+      duration: preview.duration,
       task_id: taskId
     }
 
@@ -1116,14 +1155,20 @@ const mutations = {
       revision: preview.revision,
       position: preview.position,
       original_name: preview.original_name,
-      extension: preview.extension
+      extension: preview.extension,
+      duration: preview.duration
     }
     state.taskPreviews[taskId].shift()
     state.taskPreviews[taskId] = [newPreview].concat(state.taskPreviews[taskId])
   },
 
   [ADD_SELECTED_TASK](state, validationInfo) {
-    if (validationInfo.task) {
+    if (validationInfo.id) {
+      const task = validationInfo
+      state.selectedTasks.set(task.id, task)
+      state.selectedTasks = new Map(state.selectedTasks) // for reactivity
+      state.nbSelectedTasks = state.selectedTasks.size
+    } else if (validationInfo.task) {
       state.selectedTasks.set(validationInfo.task.id, validationInfo.task)
       state.selectedTasks = new Map(state.selectedTasks) // for reactivity
       state.nbSelectedTasks = state.selectedTasks.size
@@ -1402,15 +1447,9 @@ const mutations = {
       p => p.revision === revision
     )
     preview.previews = arrayMove(preview.previews, previousIndex, newIndex)
-    let i = 1
-    preview.previews.forEach(preview => {
-      preview.position = i
-      i++
+    preview.previews.forEach((preview, index) => {
+      preview.position = index + 1
     })
-  },
-
-  [REMOVE_FIRST_PREVIEW_FILE_TO_UPLOAD](state) {
-    state.previewForms = state.previewForms.splice(1)
   },
 
   [SET_UPLOAD_PROGRESS](state, { name, percent }) {

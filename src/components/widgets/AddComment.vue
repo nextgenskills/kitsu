@@ -32,6 +32,7 @@
             active: mode === 'publish'
           }"
           @click="mode = 'publish'"
+          v-if="!isConcept"
         >
           {{ $t('tasks.publish_revision') }}
         </span>
@@ -41,11 +42,25 @@
         :members="atOptions"
         name-key="full_name"
         :limit="2"
-        @input="onTextChanged"
+        @input="onAtTextChanged"
         v-if="mode === 'status' || showCommentArea"
       >
         <template slot="item" slot-scope="team">
           <template v-if="team.item.isTime"> ⏱️ frame </template>
+          <template v-else-if="team.item.isDepartment">
+            <span
+              class="mr05"
+              :style="{
+                background: team.item.color,
+                width: '10px',
+                height: '10px',
+                'border-radius': '50%'
+              }"
+            >
+              &nbsp;
+            </span>
+            {{ team.item.full_name }}
+          </template>
           <template v-else>
             <div class="flexrow">
               <people-avatar
@@ -53,7 +68,7 @@
                 :person="team.item"
                 :size="20"
                 :font-size="11"
-                :no-cache="true"
+                :is-lazy="false"
                 :is-link="false"
               />
               <span class="flexrow-item">
@@ -65,10 +80,10 @@
         <textarea-autosize
           ref="comment-textarea"
           class="textarea flexrow-item"
-          :placeholder="$t('comments.add_comment')"
           :disabled="isLoading"
           :min-height="50"
           :max-height="300"
+          :placeholder="$t('comments.add_comment')"
           @keyup.enter.ctrl.native="
             runAddComment(
               text,
@@ -94,7 +109,11 @@
       <div class="post-area">
         <checklist
           :checklist="checklist"
+          :frame="frame + 1"
+          :revision="revision"
+          :is-movie-preview="isMovie"
           @add-item="onAddChecklistItem"
+          @insert-item="onInsertChecklistItem"
           @remove-task="removeTask"
           v-if="checklist.length > 0"
         />
@@ -256,18 +275,38 @@
       @confirm="addCommentAttachment"
       @add-snapshots="$emit('annotation-snapshots-requested')"
     />
+    <confirm-modal
+      :active="modals.confirmFeedbackPublish"
+      :text="$t('comments.confirm_publish')"
+      :confirm-button-text="$t('comments.confirm_publish_button')"
+      @cancel="modals.confirmFeedbackPublish = false"
+      @confirm="
+        modals.confirmFeedbackPublish = false
+        runAddComment(
+          text,
+          attachments,
+          checklist,
+          task_status_id,
+          nextRevision,
+          true
+        )
+      "
+    />
   </article>
 </template>
 
 <script>
 import { mapGetters } from 'vuex'
+
+import colors from '@/lib/colors'
+import drafts from '@/lib/drafts'
 import { remove } from '@/lib/models'
 import strings from '@/lib/string'
-import colors from '@/lib/colors'
 import { replaceTimeWithTimecode } from '@/lib/render'
 
 import AtTa from 'vue-at/dist/vue-at-textarea'
 import AddCommentImageModal from '@/components/modals/AddCommentImageModal'
+import ConfirmModal from '@/components/modals/ConfirmModal'
 import ButtonSimple from '@/components/widgets/ButtonSimple'
 import ComboboxStatus from '@/components/widgets/ComboboxStatus'
 import Checklist from '@/components/widgets/Checklist'
@@ -282,6 +321,7 @@ export default {
     AtTa,
     AddCommentImageModal,
     ButtonSimple,
+    ConfirmModal,
     Checklist,
     ComboboxStatus,
     PeopleAvatar
@@ -305,7 +345,8 @@ export default {
         addCommentAttachment: false
       },
       modals: {
-        addCommentAttachment: false
+        addCommentAttachment: false,
+        confirmFeedbackPublish: false
       }
     }
   },
@@ -314,6 +355,10 @@ export default {
     addComment: {
       type: Function,
       default: null
+    },
+    frame: {
+      type: Number,
+      default: 0
     },
     isError: {
       type: Boolean,
@@ -386,16 +431,17 @@ export default {
         })
       }
     })
-    this.resetStatus()
   },
 
   computed: {
     ...mapGetters([
       'currentProduction',
+      'departmentMap',
       'isDarkTheme',
       'isCurrentUserArtist',
       'isCurrentUserClient',
       'uploadProgress',
+      'productionDepartmentIds',
       'taskStatusForCurrentUser',
       'taskTypeMap',
       'taskStatusMap'
@@ -410,6 +456,10 @@ export default {
         this.taskStatus.find(t => t.id === this.task_status_id) ||
         this.taskStatus[0]
       return status.is_retake && this.checklist.length === 0
+    },
+
+    isConcept() {
+      return this.$route.path.includes('concept')
     },
 
     isValidForm() {
@@ -441,8 +491,24 @@ export default {
 
   methods: {
     shortenText: strings.shortenText,
-    runAddComment(text, attachments, checklist, taskStatusId, revision) {
+    runAddComment(
+      text,
+      attachments,
+      checklist,
+      taskStatusId,
+      revision,
+      force = false
+    ) {
       if (!this.isValidForm) {
+        return
+      }
+      const taskStatus = this.taskStatusMap.get(this.task_status_id)
+      if (
+        taskStatus.is_feedback_request &&
+        this.previewForms.length === 0 &&
+        !force
+      ) {
+        this.modals.confirmFeedbackPublish = true
         return
       }
 
@@ -476,8 +542,11 @@ export default {
     },
 
     focus() {
-      if (this.$refs['comment-textarea']) {
-        this.$refs['comment-textarea'].$el.focus()
+      const textarea = this.$refs['comment-textarea']
+      if (textarea) {
+        textarea.$el.focus()
+        const caretPosition = textarea.$el.value.length
+        textarea.$el.setSelectionRange(caretPosition, caretPosition)
       }
     },
 
@@ -496,17 +565,22 @@ export default {
       this.checklist.push(item)
     },
 
+    onInsertChecklistItem(item) {
+      this.checklist.splice(item.index, 0, item)
+      for (let i = 0; i < this.checklist.length; i++) {
+        this.checklist[i].index = i
+      }
+    },
+
     resetStatus() {
-      if (this.task) {
-        const taskStatus = this.taskStatusMap.get(this.task.task_status_id)
-        if (
-          (!this.isCurrentUserArtist || taskStatus.is_artist_allowed) &&
-          (!this.isCurrentUserClient || taskStatus.is_client_allowed)
-        ) {
-          this.task_status_id = this.task.task_status_id
-        } else {
-          this.task_status_id = this.taskStatusForCurrentUser[0].id
-        }
+      const taskStatus = this.taskStatusMap.get(this.task.task_status_id)
+      if (
+        (!this.isCurrentUserArtist || taskStatus.is_artist_allowed) &&
+        (!this.isCurrentUserClient || taskStatus.is_client_allowed)
+      ) {
+        this.task_status_id = this.task.task_status_id
+      } else {
+        this.task_status_id = this.taskStatusForCurrentUser[0].id
       }
     },
 
@@ -533,7 +607,7 @@ export default {
       this.isDragging = false
     },
 
-    onAddCommentAttachmentClicked(comment) {
+    onAddCommentAttachmentClicked() {
       this.modals.addCommentAttachment = true
     },
 
@@ -565,23 +639,17 @@ export default {
 
     setValue(comment) {
       this.checklist = comment.checklist
-      this.$nextTick(() => {
-        this.$refs['comment-textarea'].value = comment.text
-        this.text = comment.text
-      })
+      this.text = comment.text
     },
 
-    onTextChanged(input) {
-      if (input.indexOf('@frame') >= 0) {
-        this.$nextTick(() => {
-          const text = replaceTimeWithTimecode(
-            this.$refs['comment-textarea'].value,
-            this.revision,
-            this.time,
-            this.fps
-          )
-          this.$refs['comment-textarea'].value = text
-        })
+    onAtTextChanged(input) {
+      if (input.includes('@frame')) {
+        this.text = replaceTimeWithTimecode(
+          input,
+          this.revision,
+          this.frame + 1,
+          this.fps
+        )
       }
     },
 
@@ -599,15 +667,19 @@ export default {
   },
 
   watch: {
-    task() {
-      this.resetStatus()
+    task: {
+      immediate: true,
+      handler() {
+        this.resetStatus()
+        const draft = drafts.getTaskDraft(this.task.id)
+        if (draft) {
+          this.text = draft
+        }
+      }
     },
 
-    task_status_id() {
-      const taskStatus = this.taskStatusMap.get(this.task_status_id)
-      if (taskStatus.is_feedback_request) {
-        this.mode = 'publish'
-      }
+    text() {
+      drafts.setTaskDraft(this.task.id, this.text)
     },
 
     mode() {
@@ -646,6 +718,17 @@ export default {
         } else {
           this.atOptions = [...this.team]
         }
+        this.atOptions = this.atOptions.concat(
+          this.productionDepartmentIds.map(departmentId => {
+            const department = this.departmentMap.get(departmentId)
+            return {
+              isDepartment: true,
+              full_name: department.name,
+              color: department.color,
+              id: departmentId
+            }
+          })
+        )
         this.atOptions.push({
           isTime: true,
           full_name: 'frame'

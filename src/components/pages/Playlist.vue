@@ -94,7 +94,7 @@
         </div>
         <spinner class="mt2" v-else />
         <error-text
-          text="$t('playlists.loading_error')"
+          :text="$t('playlists.loading_error')"
           v-if="errors.playlistLoading"
         />
       </div>
@@ -180,7 +180,7 @@
           :entities="currentEntities"
           :is-loading="loading.playlist"
           :is-adding-entity="isAddingEntity"
-          :is-asset-playlist="isAssetPlaylist"
+          :current-entity-type="currentEntityType"
           @edit-clicked="showEditModal"
           @show-add-entities="toggleAddEntities"
           @preview-changed="onPreviewChanged"
@@ -191,6 +191,7 @@
           @annotation-changed="onAnnotationChanged"
           @for-client-changed="onForClientChanged"
           @annotations-refreshed="onAnnotationsRefreshed"
+          @new-entity-dropped="onNewEntityDropped"
         />
 
         <div
@@ -257,7 +258,7 @@
                 }"
                 :disabled="isAdditionLoading"
                 @click="addEpisodePending"
-                v-if="isTVShow && !isAssetPlaylist"
+                v-if="isTVShow && !isAssetPlaylist && !isSequencePlaylist"
               >
                 {{ $t('playlists.add_episode') }}
               </button>
@@ -318,6 +319,41 @@
                 </div>
               </div>
             </div>
+            <div v-else-if="isSequencePlaylist">
+              <div class="addition-entities">
+                <div
+                  :class="{
+                    'addition-shot': true,
+                    playlisted: currentEntities[sequence.id] !== undefined
+                  }"
+                  :key="sequence.id"
+                  @click.prevent="addEntityToPlaylist(sequence)"
+                  v-for="sequence in displayedSequences.filter(
+                    s => !s.canceled
+                  )"
+                >
+                  <light-entity-thumbnail
+                    :preview-file-id="sequence.preview_file_id"
+                    width="150px"
+                    height="100px"
+                  />
+                  <div>
+                    <span
+                      :title="getTaskStatus(sequence).name"
+                      :style="{
+                        color: getTaskStatus(sequence).color
+                      }"
+                      v-if="currentPlaylist.task_type_id"
+                    >
+                      &bullet;
+                    </span>
+                    <span class="playlisted-shot-name">{{
+                      sequence.name
+                    }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div v-else>
               <div
                 :key="'sequence-' + i"
@@ -335,33 +371,40 @@
                   </button>
                 </h2>
                 <div class="addition-entities">
-                  <div
-                    :class="{
-                      'addition-shot': true,
-                      playlisted: currentEntities[shot.id] !== undefined
-                    }"
+                  <drag
                     :key="shot.id"
-                    @click.prevent="addEntityToPlaylist(shot)"
+                    :transfer-data="shot.id"
                     v-for="shot in sequenceShots.filter(s => !s.canceled)"
                   >
-                    <light-entity-thumbnail
-                      :preview-file-id="shot.preview_file_id"
-                      width="150px"
-                      height="100px"
-                    />
-                    <div>
-                      <span
-                        :title="getTaskStatus(shot).name"
-                        :style="{
-                          color: getTaskStatus(shot).color
-                        }"
-                        v-if="currentPlaylist.task_type_id"
-                      >
-                        &bullet;
-                      </span>
-                      <span class="playlisted-shot-name">{{ shot.name }}</span>
+                    <div
+                      :class="{
+                        'addition-shot': true,
+                        playlisted: currentEntities[shot.id] !== undefined
+                      }"
+                      :transfer-data="shot.id"
+                      @click.prevent="addEntityToPlaylist(shot)"
+                    >
+                      <light-entity-thumbnail
+                        :preview-file-id="shot.preview_file_id"
+                        width="150px"
+                        height="100px"
+                      />
+                      <div>
+                        <span
+                          :title="getTaskStatus(shot).name"
+                          :style="{
+                            color: getTaskStatus(shot).color
+                          }"
+                          v-if="currentPlaylist.task_type_id"
+                        >
+                          &bullet;
+                        </span>
+                        <span class="playlisted-shot-name">{{
+                          shot.name
+                        }}</span>
+                      </div>
                     </div>
-                  </div>
+                  </drag>
                 </div>
               </div>
             </div>
@@ -384,7 +427,7 @@
     <build-filter-modal
       ref="build-filter-modal"
       :active="modals.isBuildFilterDisplayed"
-      :entity-type="isAssetPlaylist ? 'asset' : 'shot'"
+      :entity-type="currentEntityType"
       @confirm="confirmBuildFilter"
       @cancel="modals.isBuildFilterDisplayed = false"
     />
@@ -417,7 +460,7 @@ import Spinner from '@/components/widgets/Spinner'
 import TaskTypeName from '@/components/widgets/TaskTypeName'
 
 export default {
-  name: 'productions',
+  name: 'playlist',
 
   components: {
     BuildFilterModal,
@@ -491,6 +534,7 @@ export default {
       'currentProduction',
       'displayedAssets',
       'displayedAssetsByType',
+      'displayedSequences',
       'displayedShots',
       'displayedShotsBySequence',
       'isAssetsLoading',
@@ -502,6 +546,7 @@ export default {
       'playlistMap',
       'playlists',
       'playlistsPath',
+      'sequenceMap',
       'shotsByEpisode',
       'shotSearchText',
       'shotMap',
@@ -523,6 +568,14 @@ export default {
       return this.currentPlaylist.for_entity === 'asset'
     },
 
+    isSequencePlaylist() {
+      return this.currentPlaylist.for_entity === 'sequence'
+    },
+
+    currentEntityType() {
+      return this.currentPlaylist.for_entity
+    },
+
     isAddSearchVisible() {
       return (
         (this.isAssetPlaylist && this.assetSearchText) ||
@@ -541,6 +594,8 @@ export default {
     addEntitiesText() {
       if (this.isAssetPlaylist) {
         return this.$t('playlists.add_assets')
+      } else if (this.isSequencePlaylist) {
+        return this.$t('playlists.add_sequences')
       } else {
         return this.$t('playlists.add_shots')
       }
@@ -558,7 +613,7 @@ export default {
       }
       return (
         `${productionName} - ${episodeName}` +
-        ` | ${this.$t('playlists.title')} - NextGen:RISE`
+        ` | ${this.$t('playlists.title')} - Kitsu`
       )
     },
 
@@ -566,7 +621,7 @@ export default {
       const productionName = this.currentProduction
         ? this.currentProduction.name
         : ''
-      return `${productionName} ${this.$t('playlists.title')} - NextGen:RISE`
+      return `${productionName} ${this.$t('playlists.title')} - Kitsu`
     },
 
     taskTypeList() {
@@ -602,9 +657,10 @@ export default {
       'refreshPlaylist',
       'removeEntityPreviewFromPlaylist',
       'removeBuildJobFromList',
+      'resetSequences',
       'setAssetSearch',
       'setCurrentEpisode',
-      'setHelpSection',
+      'setSequenceSearch',
       'setShotSearch',
       'updatePreviewAnnotation'
     ]),
@@ -633,9 +689,10 @@ export default {
     },
 
     getTaskStatus(entity) {
-      entity = this.shotMap.get(entity.id)
-      if (!entity) entity = this.assetMap.get(entity.id)
-      if (!entity) return {}
+      let entityWithTasks = this.shotMap.get(entity.id)
+      if (!entityWithTasks) entityWithTasks = this.assetMap.get(entity.id)
+      if (!entityWithTasks) entityWithTasks = this.sequenceMap.get(entity.id)
+      if (!entityWithTasks) return {}
 
       const taskId = entity.validations.get(this.currentPlaylist.task_type_id)
       if (taskId) {
@@ -781,6 +838,11 @@ export default {
       let entity
       if (this.isAssetPlaylist) {
         entity = this.assetMap.get(entityInfo.id)
+      } else if (this.isSequencePlaylist) {
+        entity = this.sequenceMap.get(entityInfo.id)
+        if (this.currentEpisode) {
+          entity.episode_name = this.currentEpisode.name
+        }
       } else {
         entity = this.shotMap.get(entityInfo.id)
       }
@@ -788,11 +850,22 @@ export default {
         const playlistEntity = {
           id: entityInfo.id,
           name: entity.name,
-          parent_name: entity.sequence_name || entity.asset_type_name,
+          parent_name:
+            entity.sequence_name ||
+            entity.episode_name ||
+            entity.asset_type_name,
           preview_files: entityInfo.preview_files,
           preview_file_id: entityInfo.preview_file_id || entity.preview_file_id,
           preview_file_extension:
             entityInfo.preview_file_extension || entity.preview_file_extension,
+          preview_file_revision:
+            entityInfo.preview_file_revision || entity.preview_file_revision,
+          preview_file_width:
+            entityInfo.preview_file_width || entity.preview_file_width,
+          preview_file_height:
+            entityInfo.preview_file_height || entity.preview_file_height,
+          preview_file_duration:
+            entityInfo.preview_file_duration || entity.preview_file_duration,
           preview_file_task_id:
             entityInfo.task_id ||
             entityInfo.preview_file_task_id ||
@@ -844,12 +917,14 @@ export default {
       }
     },
 
-    addEntity(entity) {
+    addEntity(entity, scrollRight = true) {
       return this.loadEntityPreviewFiles(entity)
         .then(previewFiles => {
           return this.addToStorePlaylistAndSave(previewFiles, entity)
         })
-        .then(this.addToPlayerPlaylist)
+        .then(entity => {
+          this.addToPlayerPlaylist(entity, scrollRight)
+        })
         .catch(err => console.error(err))
     },
 
@@ -861,18 +936,38 @@ export default {
       })
     },
 
-    addToPlayerPlaylist(entity) {
+    addToPlayerPlaylist(entity, scrollRight = true) {
       const playlistEntity = this.convertEntityToPlaylistFormat(entity)
       Vue.set(this.currentEntities, playlistEntity.id, playlistEntity)
       this.playlistPlayer.entityList.push(playlistEntity)
-      this.$nextTick(() => {
-        this.playlistPlayer.scrollToRight()
-      })
+      if (scrollRight) {
+        this.$nextTick(() => {
+          this.playlistPlayer.scrollToRight()
+        })
+      }
     },
 
     addEntityToPlaylist(entity) {
       if (!this.currentEntities[entity.id]) {
         this.addEntity(entity).then(this.playlistPlayer.scrollToRight())
+      }
+    },
+
+    onNewEntityDropped(info) {
+      let entity = null
+      if (this.isAssetPlaylist) {
+        entity = this.assetMap.get(info.after)
+      } else if (this.isSequencePlaylist) {
+        entity = this.sequenceMap.get(info.after)
+      } else {
+        entity = this.shotMap.get(info.after)
+      }
+
+      if (entity && !this.currentEntities[entity.id]) {
+        const notScrollRight = false
+        this.addEntity(entity, notScrollRight).then(() => {
+          this.playlistPlayer.onEntityDropped(info)
+        })
       }
     },
 
@@ -1018,6 +1113,9 @@ export default {
         if (this.isAssetPlaylist) {
           this.setAssetSearch(searchQuery)
           this.displayMoreAssets()
+        } else if (this.isSequencePlaylist) {
+          this.setSequenceSearch(searchQuery)
+          this.resetSequences()
         } else {
           this.setShotSearch(searchQuery)
           this.displayMoreShots()
@@ -1025,6 +1123,8 @@ export default {
       } else {
         if (this.isAssetPlaylist) {
           this.setAssetSearch('')
+        } else if (this.isSequencePlaylist) {
+          this.setSequenceSearch('')
         } else {
           this.setShotSearch('')
         }
@@ -1203,7 +1303,6 @@ export default {
 
   mounted() {
     // Next tick needed to ensure that current production is properly set.
-    this.setHelpSection('playlist')
     this.$nextTick(() => {
       this.reloadAll()
       if (localStorage.getItem('playlist-sort')) {
@@ -1252,7 +1351,7 @@ export default {
     },
 
     isListToggled() {
-      this.playlistPlayer.onWindowResize()
+      this.playlistPlayer?.onWindowResize()
     },
 
     taskTypeId() {

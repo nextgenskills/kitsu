@@ -3,19 +3,27 @@
     <div
       id="c-mask-user-menu"
       @click="toggleUserMenu()"
-      v-bind:class="{ 'is-active': !isUserMenuHidden }"
+      :class="{ 'is-active': !isUserMenuHidden }"
     ></div>
 
     <nav class="nav">
       <div class="nav-left">
         <a
-          class="nav-item sidebar-button"
           id="toggle-menu-button"
+          :class="{
+            'studio-logo-wrapper': true,
+            'nav-item': true,
+            selected: !isSidebarHidden
+          }"
           @click="toggleSidebar()"
-          :class="{ selected: !isSidebarHidden }"
           v-if="!isCurrentUserClient"
         >
-          ≡
+          <img
+            class="studio-logo"
+            :src="logoPath"
+            v-if="organisation && organisation.has_avatar"
+          />
+          <img class="studio-logo" src="../../assets/kitsu.png" v-else />
         </a>
 
         <div class="flexrow topbar-menu" v-if="isProductionContext">
@@ -74,8 +82,8 @@
         <router-link
           class="nav-item"
           :to="{
-            name: 'todos-tab',
-            params: { tab: 'todos' }
+            name: 'todos',
+            query: { section: 'todos' }
           }"
           v-if="!isCurrentUserAdmin && !isCurrentUserClient"
         >
@@ -85,21 +93,28 @@
         <router-link
           class="nav-item mr05"
           :to="{
-            name: 'todos-tab',
-            params: { tab: 'timesheets' }
+            name: 'todos',
+            query: { section: 'timesheets' }
           }"
-          v-if="!isCurrentUserAdmin && !isCurrentUserClient && !isSimpleMode"
+          v-if="!isCurrentUserAdmin && !isCurrentUserClient"
         >
           {{ $t('timesheets.title') }}
         </router-link>
-        <global-search-field class="flexrow-item mr0" />
+        <global-search-field
+          class="flexrow-item mr0"
+          v-if="mainConfig.indexer_configured"
+        />
         <div class="nav-item">
-          <button data-canny-changelog class="changelog-button"  v-if="!isSimpleMode">
+          <a
+            class="changelog-button"
+            target="_blank"
+            href="https://cgwire.canny.io/changelog"
+          >
             <zap-icon />
-          </button>
+          </a>
         </div>
         <notification-bell />
-        <div class="nav-item"  v-if="!isSimpleMode">
+        <div class="nav-item">
           <a
             class="changelog-button help-button"
             href="https://kitsu.cg-wire.com/"
@@ -109,20 +124,15 @@
           </a>
         </div>
         <div
-          :class="{
-            'nav-item': true,
-            'user-nav': true,
-            active: !isUserMenuHidden
-          }"
-          ref="user-name"
+          class="nav-item user-nav"
+          :class="{ active: !isUserMenuHidden }"
           @click="toggleUserMenu"
         >
           <people-avatar
-            ref="avatar"
             class="avatar"
-            :no-cache="true"
-            :person="user"
+            :is-lazy="false"
             :is-link="false"
+            :person="user"
           />
         </div>
       </div>
@@ -130,9 +140,8 @@
 
     <nav
       class="user-menu"
-      ref="user-menu"
       :style="{
-        top: isUserMenuHidden ? '-480px' : '60px'
+        top: isUserMenuHidden ? '-500px' : '60px'
       }"
     >
       <ul>
@@ -149,7 +158,7 @@
             {{ $t('main.white_theme') }}
           </span>
         </li>
-        <li @click="setSupportChat(!isSupportChat)" v-if="!isSimpleMode">
+        <li @click="setSupportChat(!isSupportChat)">
           <span v-if="isSupportChat">
             {{ $t('main.hide_support_chat') }}
           </span>
@@ -157,36 +166,40 @@
             {{ $t('main.show_support_chat') }}
           </span>
         </li>
-        <hr   v-if="!isSimpleMode" />
+        <hr />
         <a
           href="https://www.youtube.com/playlist?list=PLp_1gB5ZBHXqnQgZ4TCrAt7smxesaDo29"
           target="_blank"
-          v-if="!isSimpleMode"
         >
           <li>
             {{ $t('main.tutorials') }}
           </li>
         </a>
-        <a @click="display.shortcutModal = true"  v-if="!isSimpleMode">
+        <a @click="display.shortcutModal = true">
           <li>
             {{ $t('keyboard.shortcuts') }}
           </li>
         </a>
-        <hr  v-if="!isSimpleMode" />
-        <a href="https://discord.gg/VbCxtKN" target="_blank"  v-if="!isSimpleMode">
+        <hr />
+        <a href="https://discord.gg/VbCxtKN" target="_blank">
           <li>Discord</li>
         </a>
-        <a href="https://cgwire.canny.io" target="_blank"  v-if="!isSimpleMode">
+        <a href="https://linkedin.com/company/cgwire/" target="_blank">
+          <li>LinkedIn</li>
+        </a>
+        <a href="https://twitter.com/cgwirekitsu" target="_blank">
+          <li>X</li>
+        </a>
+        <a href="https://cgwire.canny.io" target="_blank">
           <li>Roadmap / Feedback</li>
         </a>
         <hr />
-        <a href="https://cg-wire.com/en/about.html" target="_blank">
+        <a href="https://cg-wire.com/about" target="_blank">
           <li>
             {{ $t('main.about') }}
           </li>
         </a>
-        <li class="version">NextGen:RISE</li>
-        <li class="version">Powered by Kitsu</li>
+        <li class="version">Kitsu {{ kitsuVersion }}</li>
         <hr />
         <li class="flexrow" @click="onLogoutClicked">
           <log-out-icon class="flexrow-item" size="1x" />
@@ -254,11 +267,6 @@ export default {
   },
 
   mounted() {
-    Canny('initChangelog', {
-      appID: '5db968118d1a9c132c168d54',
-      position: 'bottom',
-      align: 'right'
-    })
     this.currentProjectSection = this.getCurrentSectionFromRoute()
     this.setProductionFromRoute()
   },
@@ -284,13 +292,21 @@ export default {
       'isNewNotification',
       'lastProductionScreen',
       'lastProductionViewed',
+      'mainConfig',
       'openProductions',
       'openProductionOptions',
+      'organisation',
       'productionMap',
       'productionEditTaskTypes',
-      'user',
-      'isSimpleMode'
+      'user'
     ]),
+
+    logoPath() {
+      return (
+        '/api/pictures/thumbnails/' +
+        `organisations/${this.organisation.id}.png`
+      )
+    },
 
     assetSections() {
       return ['assets', 'assetTypes', 'playlists']
@@ -398,12 +414,20 @@ export default {
     },
 
     sectionOptions() {
-      let options = [
-        { label: this.$t('assets.title'), value: 'assets' },
-        { label: this.$t('shots.title'), value: 'shots' }
-      ]
+      if (!this.currentProduction) return []
 
-      if (!this.isCurrentUserClient) {
+      let options = []
+      const isNotOnlyAssets =
+        this.currentProduction.production_type !== 'assets'
+      const isNotOnlyShots = this.currentProduction.production_type !== 'shots'
+
+      if (isNotOnlyShots) {
+        options.push({ label: this.$t('assets.title'), value: 'assets' })
+      }
+      if (isNotOnlyAssets) {
+        options.push({ label: this.$t('shots.title'), value: 'shots' })
+      }
+      if (!this.isCurrentUserClient && isNotOnlyAssets) {
         options.push({ label: this.$t('sequences.title'), value: 'sequences' })
       }
 
@@ -413,7 +437,15 @@ export default {
       }
 
       if (this.isTVShow && !this.isCurrentUserClient) {
-        options.push({ label: 'Episodes', value: 'episodes' })
+        options.push({ label: this.$t('episodes.title'), value: 'episodes' })
+      }
+
+      options = options.concat([{ label: 'separator', value: 'separator' }])
+
+      if (!this.isCurrentUserClient) {
+        options = options.concat([
+          { label: this.$t('concepts.title'), value: 'concepts' }
+        ])
       }
 
       if (!this.isCurrentUserClient) {
@@ -437,10 +469,12 @@ export default {
       options = options.concat([{ label: 'separator', value: 'separator' }])
 
       // Add sequences
-      options.push({
-        label: this.$t('sequences.stats_title'),
-        value: 'sequence-stats'
-      })
+      if (isNotOnlyAssets) {
+        options.push({
+          label: this.$t('sequences.stats_title'),
+          value: 'sequence-stats'
+        })
+      }
 
       // Add episodes for tv show only
       if (this.isTVShow) {
@@ -450,21 +484,25 @@ export default {
       }
 
       // Add asset types stats
-      options = options.concat([
-        {
-          label: this.$t('asset_types.production_title'),
-          value: 'assetTypes'
-        }
-      ])
+      if (isNotOnlyShots) {
+        options = options.concat([
+          {
+            label: this.$t('asset_types.production_title'),
+            value: 'assetTypes'
+          }
+        ])
+      }
 
       // Show these sections to studio members only.
       if (!this.isCurrentUserClient) {
         options = options.concat([
           { label: 'separator', value: 'separator' },
-          //{ label: this.$t('schedule.title'), value: 'schedule' },
-          //{ label: this.$t('quota.title'), value: 'quota' },
-          { label: this.$t('people.team'), value: 'team' }
+          { label: this.$t('schedule.title'), value: 'schedule' }
         ])
+        if (isNotOnlyAssets) {
+          options.push({ label: this.$t('quota.title'), value: 'quota' })
+        }
+        options.push({ label: this.$t('people.team'), value: 'team' })
 
         if (this.isCurrentUserAdmin || this.isCurrentUserManager) {
           options = options.concat([
@@ -494,10 +532,9 @@ export default {
     },
 
     currentSectionOption() {
-      return (
-        this.sectionOptions.find(o => o.value === this.currentProjectSection) ||
-        {}
-      ).value
+      return this.sectionOptions.find(
+        option => option.value === this.currentProjectSection
+      )?.value
     }
   },
 
@@ -709,7 +746,6 @@ export default {
       // TODO seems deprecated
       const section =
         this.currentProjectSection || this.getCurrentSectionFromRoute()
-      const isAssetSection = this.assetSections.includes(section)
       const isEditSection = this.editSections.includes(section)
       const isShotSection = this.shotSections.includes(section)
       const isAssetEpisode = ['all', 'main'].includes(this.currentEpisodeId)
@@ -797,12 +833,6 @@ export default {
         ) {
           this.incrementNotificationCounter()
         }
-      },
-
-      'person:update'(eventData) {
-        if (this.user.id === eventData.person_id) {
-          this.$refs.avatar.reloadAvatar()
-        }
       }
     }
   }
@@ -813,10 +843,6 @@ export default {
 .dark {
   a,
   .user-menu ul a {
-    color: $white-grey;
-  }
-
-  #toggle-menu-button:hover {
     color: $white-grey;
   }
 
@@ -851,10 +877,6 @@ export default {
   position: fixed;
   right: 0;
   z-index: 204;
-}
-
-#toggle-menu-button {
-  font-size: 2em;
 }
 
 .avatar {
@@ -969,6 +991,18 @@ strong {
 .user-menu {
   padding: 10px;
   border-bottom-left-radius: 10px;
+}
+
+.studio-logo-wrapper {
+  margin: 8px 8px;
+  margin-right: 1em;
+  padding: 0;
+
+  .studio-logo {
+    border-radius: 5px;
+    min-height: 36px;
+    width: 36px;
+  }
 }
 
 @media screen and (max-width: 768px) {

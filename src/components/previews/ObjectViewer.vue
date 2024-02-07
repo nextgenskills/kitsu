@@ -1,48 +1,37 @@
 <template>
   <div
-    id="model-container"
+    class="model-container"
+    :class="{
+      light: light && !readOnly
+    }"
     :style="{
       height: defaultHeight ? defaultHeight + 'px' : '100%',
       width: '100%'
     }"
-    :class="{
-      light: light && !readOnly
-    }"
   >
     <model-viewer
-      id="model-viewer"
-      loading="eager"
-      camera-controls
-      :src="previewUrl"
       autoplay
-    >
-    </model-viewer>
+      camera-controls
+      class="model-viewer"
+      loading="eager"
+      :environment-image="backgroundUrl"
+      :skybox-image="isEnvironmentSkybox ? backgroundUrl : ''"
+      :src="previewUrl"
+      :variant-name="isWireframe ? 'variant-wireframe' : null"
+      @before-render="createWireframeVariant($event.target.model)"
+    />
   </div>
 </template>
 
 <script>
-import {} from 'vue-feather-icons'
-
 import('@google/model-viewer')
 
 export default {
   name: 'object-viewer',
 
-  components: {},
-
-  data() {
-    return {
-      isLoading: false
-    }
-  },
-
   props: {
     previewUrl: {
-      default: '',
-      type: String
-    },
-    previewDlPath: {
-      default: '',
+      default: null,
       type: String
     },
     light: {
@@ -53,47 +42,67 @@ export default {
       default: false,
       type: Boolean
     },
-    empty: {
-      default: false,
-      type: Boolean
-    },
     defaultHeight: {
-      type: Number,
-      default: 0
+      default: 0,
+      type: Number
     },
-    fullScreen: {
+    backgroundUrl: {
+      type: String
+    },
+    isEnvironmentSkybox: {
+      default: false,
+      type: Boolean
+    },
+    isWireframe: {
       default: false,
       type: Boolean
     }
   },
 
-  mounted() {},
-
-  computed: {
-    container() {
-      return this.$refs.container
+  methods: {
+    /**
+     * Create a wireframe variant of each material of a 3D model
+     * @param {Model} model - model from model-viewer component
+     */
+    createWireframeVariant(model) {
+      const maxIndex = model.materials.length
+      for (let i = 0; i < maxIndex; i++) {
+        const variantMaterial = model.createMaterialInstanceForVariant(
+          i,
+          `material-wireframe-${i}`,
+          'variant-wireframe',
+          this.isWireframe
+        )
+        if (!variantMaterial) {
+          continue
+        }
+        const texture = variantMaterial.normalTexture
+        const materialsSymbol = Object.getOwnPropertySymbols(texture).find(
+          symbol => symbol.description === 'materials'
+        )
+        const materials = texture[materialsSymbol]
+        materials.forEach(material => {
+          material.wireframe = true
+          material.color.setHex(0xc0c0c0)
+          material.emissive?.setHex(0xc0c0c0)
+          material.emissiveMap = null
+          material.envMapIntensity = 0
+        })
+      }
     }
-  },
-
-  methods: {},
-
-  watch: {
-    defaultHeight() {},
-
-    previewUrl() {},
-
-    light() {}
   }
 }
 </script>
 
 <style lang="scss" scoped>
-#model-viewer.light {
-  height: 200px;
-}
-
-#model-viewer {
+.model-viewer {
   height: 100%;
   width: 100%;
+  background-color: #333;
+  --progress-bar-color: #999;
+
+  &.light {
+    height: 200px;
+  }
 }
 </style>

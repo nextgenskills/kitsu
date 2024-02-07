@@ -3,6 +3,7 @@
     <div class="flexrow">
       <date-field
         class="flexrow-item"
+        :can-delete="false"
         :disabled-dates="{ from: today }"
         :label="$t('logs.current_date_label')"
         v-model="currentDate"
@@ -88,7 +89,7 @@ import PeopleName from '@/components/widgets/PeopleName'
 import Spinner from '@/components/widgets/Spinner'
 
 export default {
-  name: 'Events',
+  name: 'events',
   mixins: [timeMixin],
 
   components: {

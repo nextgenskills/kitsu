@@ -23,6 +23,7 @@
         :maxlength="maxlength"
         :min="min"
         :max="max || undefined"
+        :required="required"
         :step="step || 'any'"
         :readonly="readonly"
         @input="updateValue()"
@@ -36,12 +37,13 @@
         {{ buttonLabel }}
       </button>
     </p>
+    <p class="error" v-if="errored">
+      {{ errorText }}
+    </p>
   </div>
 </template>
 
 <script>
-import { mapGetters, mapActions } from 'vuex'
-
 export default {
   name: 'text-field',
   props: {
@@ -95,6 +97,10 @@ export default {
       default: false,
       type: Boolean
     },
+    errorText: {
+      default: '',
+      type: String
+    },
     emptyLabel: {
       default: false,
       type: Boolean
@@ -102,22 +108,29 @@ export default {
     readonly: {
       default: false,
       type: Boolean
+    },
+    required: {
+      default: false,
+      type: Boolean
     }
   },
 
-  computed: {
-    ...mapGetters([])
-  },
-
   methods: {
-    ...mapActions([]),
+    getInputValue() {
+      const input = this.$refs.input
+      if (this.type === 'number') {
+        return !isNaN(input.valueAsNumber) ? input.valueAsNumber : null
+      } else {
+        return input.value
+      }
+    },
 
     emitEnter() {
-      this.$emit('enter', this.$refs.input.value)
+      this.$emit('enter', this.getInputValue())
     },
 
     updateValue() {
-      this.$emit('input', this.$refs.input.value)
+      this.$emit('input', this.getInputValue())
     },
 
     focus() {

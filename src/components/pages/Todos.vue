@@ -2,58 +2,28 @@
   <div class="columns fixed-page">
     <div class="column main-column">
       <div class="todos page">
-        <div class="task-tabs tabs">
-          <ul>
-            <li :class="{ 'is-active': isTabActive('todos') }">
-              <router-link
-                :to="{
-                  name: 'todos'
-                }"
-              >
-                {{ $t('tasks.current') }}
-              </router-link>
-            </li>
-            <li
-              :class="{ 'is-active': isTabActive('done') }"
-              @click="selectTab('done')"
-            >
-              <router-link
-                :to="{
-                  name: 'todos-tab',
-                  params: { tab: 'done' }
-                }"
-              >
-                {{ $t('tasks.done') }} ({{ displayedDoneTasks.length }})
-              </router-link>
-            </li>
-            <li
-              :class="{ 'is-active': isTabActive('timesheets') }"
-              @click="selectTab('timesheets')"
-              v-if="!isSimpleMode"
-            >
-              <router-link
-                :to="{
-                  name: 'todos-tab',
-                  params: { tab: 'timesheets' }
-                }"
-              >
-                {{ $t('timesheets.title') }}
-              </router-link>
-            </li>
-          </ul>
-        </div>
+        <route-section-tabs
+          class="section-tabs"
+          :activeTab="currentSection"
+          :route="$route"
+          :tabs="todoTabs"
+        />
 
         <div class="flexrow">
           <search-field
-            :class="{
-              'search-field': true,
-              'flexrow-item': true
-            }"
+            class="flexrow-item search-field"
             ref="todos-search-field"
             @change="onSearchChange"
-            @enter="saveSearchQuery"
             @save="saveSearchQuery"
             :can-save="true"
+          />
+
+          <combobox-production
+            v-if="isTabActive('board')"
+            class="flexrow-item production-field"
+            :label="$t('main.production')"
+            :production-list="productionList"
+            v-model="productionId"
           />
 
           <span class="filler"></span>
@@ -76,10 +46,15 @@
         </div>
         <div
           class="query-list"
-          v-if="isTabActive('todos') || isTabActive('timesheets')"
+          v-if="
+            isTabActive('todos') ||
+            isTabActive('timesheets') ||
+            isTabActive('board')
+          "
         >
           <search-query-list
             :queries="todoSearchQueries"
+            type="todo"
             @change-search="changeSearch"
             @remove-search="removeSearchQuery"
           />
@@ -90,20 +65,50 @@
           :empty-text="$t('people.no_task_assigned')"
           :is-loading="isTodosLoading"
           :is-error="isTodosLoadingError"
-          :tasks="sortedTasks"
+          :tasks="notPendingTasks"
           :selection-grid="todoSelectionGrid"
           @scroll="setTodoListScrollPosition"
           v-if="isTabActive('todos')"
         />
 
+        <div v-if="isTabActive('pending')">&nbsp;</div>
+        <todos-list
+          ref="pending-list"
+          :empty-text="$t('people.no_task_assigned')"
+          :is-loading="isTodosLoading"
+          :is-error="isTodosLoadingError"
+          :tasks="pendingTasks"
+          :selection-grid="todoSelectionGrid"
+          @scroll="setTodoListScrollPosition"
+          v-if="isTabActive('pending')"
+        />
+
         <div v-if="isTabActive('done')">&nbsp;</div>
         <todos-list
           ref="done-list"
+          class="done-list"
           :tasks="displayedDoneTasks"
           :is-loading="isTodosLoading"
           :is-error="isTodosLoadingError"
+          :selection-grid="doneSelectionGrid"
           :done="true"
           v-if="isTabActive('done')"
+        />
+
+        <kanban-board
+          :is-loading="isTodosLoading"
+          :is-error="isTodosLoadingError"
+          :statuses="boardStatuses"
+          :tasks="boardTasks"
+          :user="user"
+          :production="selectedProduction"
+          v-if="isTabActive('board')"
+        />
+
+        <user-calendar
+          ref="user-calendar"
+          :tasks="sortedTasks"
+          v-if="isTabActive('calendar')"
         />
 
         <timesheet-list
@@ -125,8 +130,8 @@
       </div>
     </div>
 
-    <div class="column side-column" v-if="nbSelectedTasks === 1">
-      <task-info :task="selectedTasks.values().next().value" />
+    <div class="column side-column" v-if="nbSelectedTasks > 0">
+      <task-info :task="selectedTasks.values().next().value" with-actions />
     </div>
   </div>
 </template>
@@ -136,35 +141,49 @@ import { mapGetters, mapActions } from 'vuex'
 import moment from 'moment-timezone'
 import firstBy from 'thenby'
 
+import { sortTaskStatuses } from '@/lib/sorting'
 import { parseDate } from '@/lib/time'
+
 import Combobox from '@/components/widgets/Combobox'
+import ComboboxProduction from '@/components/widgets/ComboboxProduction'
+import KanbanBoard from '@/components/lists/KanbanBoard'
+import RouteSectionTabs from '@/components/widgets/RouteSectionTabs'
 import SearchField from '@/components/widgets/SearchField'
 import SearchQueryList from '@/components/widgets/SearchQueryList'
 import TaskInfo from '@/components/sides/TaskInfo'
 import TimesheetList from '@/components/lists/TimesheetList'
 import TodosList from '@/components/lists/TodosList'
+import UserCalendar from '@/components/widgets/UserCalendar'
 
 export default {
   name: 'todos',
 
   components: {
     Combobox,
+    ComboboxProduction,
+    KanbanBoard,
+    RouteSectionTabs,
     SearchField,
     SearchQueryList,
     TaskInfo,
     TimesheetList,
-    TodosList
+    TodosList,
+    UserCalendar
   },
 
   data() {
     return {
-      activeTab: 'todos',
       currentFilter: 'all_tasks',
       currentSort: 'priority',
+      currentSection: 'todos',
       filterOptions: ['all_tasks', 'due_this_week'].map(name => ({
         label: name,
         value: name
       })),
+      loading: {
+        savingSearch: false
+      },
+      productionId: undefined,
       selectedDate: moment().format('YYYY-MM-DD'),
       sortOptions: [
         'entity_name',
@@ -180,7 +199,6 @@ export default {
 
   mounted() {
     this.updateActiveTab()
-    this.setHelpSection('todos')
     if (this.todosSearchText.length > 0) {
       this.$refs['todos-search-field'].setValue(this.todosSearchText)
     }
@@ -211,20 +229,115 @@ export default {
     ...mapGetters([
       'displayedDoneTasks',
       'displayedTodos',
+      'doneSelectionGrid',
+      'getProductionTaskStatuses',
       'isTodosLoading',
       'isTodosLoadingError',
       'nbSelectedTasks',
+      'openProductions',
+      'productionMap',
       'selectedTasks',
+      'taskStatuses',
       'taskTypeMap',
-      'todosSearchText',
       'timeSpentMap',
       'timeSpentTotal',
       'todoListScrollPosition',
-      'todoSelectionGrid',
       'todoSearchQueries',
-      'user',
-      'isSimpleMode'
+      'todoSelectionGrid',
+      'todosSearchText',
+      'user'
     ]),
+
+    boardTasks() {
+      const tasks = this.sortedTasks.concat(this.displayedDoneTasks)
+      if (this.selectedProduction) {
+        return tasks.filter(
+          task => task.project_id === this.selectedProduction.id
+        )
+      }
+      return tasks
+    },
+
+    boardStatuses() {
+      if (this.selectedProduction) {
+        return this.getBoardStatusesByProduction(this.selectedProduction)
+      }
+
+      const productionsByStatus = {}
+      this.openProductions.forEach(production => {
+        const statuses = this.getBoardStatusesByProduction(production)
+        statuses.forEach(status => {
+          if (!productionsByStatus[status.id]) {
+            productionsByStatus[status.id] = []
+          }
+          productionsByStatus[status.id].push(production.id)
+        })
+      })
+
+      return this.taskStatuses
+        .filter(status => !status.for_concept)
+        .map(status => ({
+          ...status,
+          productions: productionsByStatus[status.id] || []
+        }))
+        .sort((a, b) => a.priority - b.priority)
+    },
+
+    productionList() {
+      return [{ name: this.$t('main.all') }, ...this.openProductions]
+    },
+
+    selectedProduction() {
+      return this.productionMap.get(this.productionId)
+    },
+
+    pendingTasks() {
+      return this.sortedTasks.filter(
+        task => task.taskStatus.is_feedback_request
+      )
+    },
+
+    notPendingTasks() {
+      return this.sortedTasks.filter(
+        task => !task.taskStatus.is_feedback_request
+      )
+    },
+
+    todoTabs() {
+      const hasAvailableBoard = this.openProductions.some(
+        production => this.getBoardStatusesByProduction(production).length
+      )
+      return [
+        {
+          label: this.$t('main.tasks'),
+          name: 'todos'
+        },
+        hasAvailableBoard
+          ? {
+              label: this.$t('board.title'),
+              name: 'board'
+            }
+          : undefined,
+        {
+          label: this.$t('tasks.calendar'),
+          name: 'calendar'
+        },
+        {
+          label: `${this.$t('tasks.pending')} (${this.pendingTasks.length})`,
+          name: 'pending'
+        },
+        {
+          label: `${this.$t('tasks.validated')} (${
+            this.displayedDoneTasks.length
+          })`,
+          name: 'done'
+        },
+        {
+          label: this.$t('timesheets.title'),
+          name: 'timesheets'
+        }
+      ].filter(Boolean)
+    },
 
     loggableTodos() {
       return this.sortedTasks.filter(task => {
@@ -311,20 +424,20 @@ export default {
 
   methods: {
     ...mapActions([
+      'clearSelectedTasks',
       'loadTodos',
       'loadOpenProductions',
       'removeTodoSearch',
       'saveTodoSearch',
       'setDayOff',
       'setTodoListScrollPosition',
-      'setHelpSection',
       'setTodosSearch',
       'setTimeSpent',
       'unsetDayOff'
     ]),
 
     isTabActive(tab) {
-      return this.activeTab === tab
+      return this.currentSection === tab
     },
 
     resizeHeaders() {
@@ -335,7 +448,7 @@ export default {
     },
 
     selectTab(tab) {
-      this.activeTab = tab
+      this.currentSection = tab
       this.resizeHeaders()
       setTimeout(() => {
         if (this.$refs['todos-search-field']) {
@@ -345,11 +458,31 @@ export default {
     },
 
     updateActiveTab() {
-      if (['done', 'timesheets'].includes(this.$route.params.tab)) {
-        this.activeTab = this.$route.params.tab
+      if (
+        ['board', 'calendar', 'done', 'pending', 'timesheets'].includes(
+          this.$route.query.section
+        )
+      ) {
+        this.currentSection = this.$route.query.section
+        if (this.currentSection === 'board') {
+          const currentProduction = this.openProductions.find(
+            ({ id }) => id === this.$route.query.productionId
+          )
+          if (currentProduction) {
+            this.productionId = currentProduction.id
+          } else {
+            this.$router.push({
+              query: {
+                productionId: this.productionId,
+                section: this.currentSection
+              }
+            })
+          }
+        }
       } else {
-        this.activeTab = 'todos'
+        this.currentSection = 'todos'
       }
+      this.clearSelectedTasks()
     },
 
     onSearchChange(text) {
@@ -362,17 +495,21 @@ export default {
     },
 
     saveSearchQuery(searchQuery) {
+      if (this.loading.savingSearch) {
+        return
+      }
+      this.loading.savingSearch = true
       this.saveTodoSearch(searchQuery)
-        .then(() => {})
         .catch(console.error)
+        .finally(() => {
+          this.loading.savingSearch = false
+        })
     },
 
     removeSearchQuery(searchQuery) {
-      this.removeTodoSearch(searchQuery)
-        .then(() => {})
-        .catch(err => {
-          if (err) console.error(err)
-        })
+      this.removeTodoSearch(searchQuery).catch(err => {
+        if (err) console.error(err)
+      })
     },
 
     onDateChanged(date) {
@@ -409,23 +546,36 @@ export default {
       this.setTimeSpent(timeSpentInfo)
     },
 
-    onAssignation(eventData) {
+    async onAssignation(eventData) {
       if (this.user.id === eventData.person_id) {
-        this.loadOpenProductions(() => {
-          this.loadTodos({
-            forced: true,
-            date: this.selectedDate,
-            callback: () => {
-              if (this.todoList) {
-                this.$nextTick(() => {
-                  this.todoList.setScrollPosition(this.todoListScrollPosition)
-                })
-              }
-              this.resizeHeaders()
+        await this.loadOpenProductions()
+        this.loadTodos({
+          forced: true,
+          date: this.selectedDate,
+          callback: () => {
+            if (this.todoList) {
+              this.$nextTick(() => {
+                this.todoList.setScrollPosition(this.todoListScrollPosition)
+              })
             }
-          })
+            this.resizeHeaders()
+          }
         })
       }
+    },
+
+    getBoardStatusesByProduction(production) {
+      const statuses = this.getProductionTaskStatuses(production.id).filter(
+        status => {
+          if (status.for_concept) {
+            return false
+          }
+          const roles_for_board =
+            production.task_statuses_link?.[status.id]?.roles_for_board
+          return roles_for_board?.includes(this.user.role)
+        }
+      )
+      return sortTaskStatuses(statuses, production)
     }
   },
 
@@ -442,56 +592,33 @@ export default {
   },
 
   watch: {
-    $route() {
+    productionId() {
+      this.$router.push({
+        query: {
+          productionId: this.productionId,
+          section: this.currentSection
+        }
+      })
+    },
+
+    '$route.query.section'() {
       this.updateActiveTab()
+    },
+
+    $route() {
+      this.currentSection = this.$route.query.section || 'todos'
     }
   },
 
   metaInfo() {
     return {
-      title: `${this.$t('tasks.my_tasks')} - NextGen:RISE`
+      title: `${this.$t('tasks.my_tasks')} - Kitsu`
     }
   }
 }
 </script>
 
 <style lang="scss" scoped>
-.task-tabs {
-  margin-top: 1em;
-  margin-bottom: 1em;
-  font-size: 1.1em;
-
-  ul {
-    margin-left: 0;
-  }
-}
-
-.data-list {
-  margin-top: 0;
-}
-
-.search-field {
-  margin-top: 1em;
-  margin-bottom: 1em;
-}
-
-.query-list {
-  margin-bottom: 2em;
-}
-
-.dark .main-column {
-  border-right: 3px solid $grey-strong;
-}
-
-.data-list {
-  margin-top: 0;
-}
-
-.todos {
-  display: flex;
-  flex-direction: column;
-}
-
 .columns {
   display: flex;
   flex-direction: row;
@@ -499,17 +626,33 @@ export default {
 }
 
 .column {
-  overflow-y: auto;
   padding: 0;
+  overflow-y: auto;
 }
 
-.main-column {
-  border-right: 3px solid $light-grey;
+.todos {
+  display: flex;
+  flex-direction: column;
 }
 
-.push-right {
-  flex: 1;
-  text-align: right;
+.section-tabs {
+  min-height: 36px;
+}
+
+.search-field {
+  margin: 25px 2em 5px 0;
+}
+
+.query-list {
+  margin-top: 0.5em;
+}
+
+.data-list {
+  margin-top: 0;
+}
+
+.done-list {
+  margin-top: 2em;
 }
 
 .field {
