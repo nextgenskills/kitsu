@@ -158,7 +158,7 @@
             {{ $t('main.white_theme') }}
           </span>
         </li>
-        <li @click="setSupportChat(!isSupportChat)">
+        <li @click="setSupportChat(!isSupportChat)" v-if="!isSimpleMode">
           <span v-if="isSupportChat">
             {{ $t('main.hide_support_chat') }}
           </span>
@@ -180,21 +180,21 @@
             {{ $t('keyboard.shortcuts') }}
           </li>
         </a>
-        <hr />
-        <a href="https://discord.gg/VbCxtKN" target="_blank">
+        <hr v-if="!isSimpleMode"/>
+        <a href="https://discord.gg/VbCxtKN" target="_blank" v-if="!isSimpleMode">
           <li>Discord</li>
         </a>
-        <a href="https://linkedin.com/company/cgwire/" target="_blank">
+        <a href="https://linkedin.com/company/cgwire/" target="_blank" v-if="!isSimpleMode">
           <li>LinkedIn</li>
         </a>
-        <a href="https://twitter.com/cgwirekitsu" target="_blank">
+        <a href="https://twitter.com/cgwirekitsu" target="_blank" v-if="!isSimpleMode">
           <li>X</li>
         </a>
-        <a href="https://cgwire.canny.io" target="_blank">
+        <a href="https://cgwire.canny.io" target="_blank" v-if="!isSimpleMode">
           <li>Roadmap / Feedback</li>
         </a>
         <hr />
-        <a href="https://cg-wire.com/about" target="_blank">
+        <a href="https://cg-wire.com/about" target="_blank" v-if="!isSimpleMode">
           <li>
             {{ $t('main.about') }}
           </li>
@@ -298,6 +298,7 @@ export default {
       'organisation',
       'productionMap',
       'productionEditTaskTypes',
+      'isSimpleMode',
       'user'
     ]),
 
