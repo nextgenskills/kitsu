@@ -58,7 +58,7 @@
               </router-link>
             </p>
 
-            <p @click="toggleSidebar()">
+            <p @click="toggleSidebar()" v-if="!isSimpleMode">
               <router-link :to="{ name: 'timesheets' }">
                 <kitsu-icon class="nav-icon" name="timesheets" />
                 {{ $t('timesheets.title') }}
