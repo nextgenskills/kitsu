@@ -307,6 +307,7 @@ export default {
   },
 
   mounted() {
+    this.setHelpSection('sequences')
     let searchQuery = ''
     if (this.sequenceSearchText && this.sequenceSearchText.length > 0) {
       this.searchField.setValue(this.sequenceSearchText)
@@ -434,7 +435,8 @@ export default {
       'setPreview',
       'setSequenceSearch',
       'showAssignations',
-      'uploadSequenceFile'
+      'uploadSequenceFile',
+      'setHelpSection'
     ]),
 
     confirmAddMetadata(form) {

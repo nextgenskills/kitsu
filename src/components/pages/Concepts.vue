@@ -199,6 +199,7 @@ export default {
   },
 
   mounted() {
+    this.setHelpSection('concepts')
     // TODO: concept search
     // this.setSearch(this.$route.query.search)
     // this.searchField.focus()
@@ -317,7 +318,8 @@ export default {
       'loadAssets',
       'loadConcepts',
       'newConcepts',
-      'setCurrentEpisode'
+      'setCurrentEpisode',
+      'setHelpSection'
     ]),
 
     // TODO: module actions

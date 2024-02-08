@@ -198,6 +198,7 @@ export default {
   },
 
   mounted() {
+    this.setHelpSection('open-productions')
     this.$refs['search-field']?.focus()
     this.filteredProductions = this.openProductions
     this.productionIndex = buildNameIndex(this.openProductions)
@@ -221,7 +222,7 @@ export default {
   },
 
   methods: {
-    ...mapActions(['newProduction']),
+    ...mapActions(['newProduction','setHelpSection']),
 
     generateAvatar(production) {
       const firstLetter = production.name.length > 0 ? production.name[0] : 'P'

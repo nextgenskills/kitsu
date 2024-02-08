@@ -662,7 +662,8 @@ export default {
       'setCurrentEpisode',
       'setSequenceSearch',
       'setShotSearch',
-      'updatePreviewAnnotation'
+      'updatePreviewAnnotation',
+      'setHelpSection'
     ]),
 
     // Helpers
@@ -1302,6 +1303,7 @@ export default {
   },
 
   mounted() {
+    this.setHelpSection('playlist')
     // Next tick needed to ensure that current production is properly set.
     this.$nextTick(() => {
       this.reloadAll()

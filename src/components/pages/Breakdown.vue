@@ -413,6 +413,7 @@ export default {
   },
 
   mounted() {
+    this.setHelpSection('breakdown')
     if (!this.isLoading) {
       this.reset()
     }
@@ -664,7 +665,8 @@ export default {
       'setCurrentEpisode',
       'setEntityCasting',
       'setLastProductionScreen',
-      'uploadCastingFile'
+      'uploadCastingFile',
+      'setHelpSection'
     ]),
 
     reset() {

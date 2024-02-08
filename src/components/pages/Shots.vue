@@ -428,6 +428,7 @@ export default {
   },
 
   mounted() {
+    this.setHelpSection('shots')
     let searchQuery = ''
     if (this.$route.query.search && this.$route.query.search.length > 0) {
       searchQuery = `${this.$route.query.search}`
@@ -576,7 +577,8 @@ export default {
       'setShotSearch',
       'showAssignations',
       'uploadShotFile',
-      'uploadEdlFile'
+      'uploadEdlFile',
+      'setHelpSection'
     ]),
 
     addEpisode(episode, callback) {
