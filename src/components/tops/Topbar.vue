@@ -495,14 +495,18 @@ export default {
       }
 
       // Show these sections to studio members only.
-      if (!this.isCurrentUserClient && !this.isSimpleMode) {
-        options = options.concat([
-          { label: 'separator', value: 'separator' },
-          { label: this.$t('schedule.title'), value: 'schedule' }
-        ])
+      if (!this.isCurrentUserClient) {
+        if(!this.isSimpleMode) {
+          options = options.concat([
+            { label: 'separator', value: 'separator' },
+            { label: this.$t('schedule.title'), value: 'schedule' }
+          ])
+        }
+
         if (isNotOnlyAssets && !this.isSimpleMode) {
           options.push({ label: this.$t('quota.title'), value: 'quota' })
         }
+        
         options.push({ label: this.$t('people.team'), value: 'team' })
 
         if (this.isCurrentUserAdmin || this.isCurrentUserManager) {

@@ -9,7 +9,7 @@
           class="flexrow-item kitsu-with-body"
           src="../../assets/illustrations/kitsu-band.png"
         />
-        <div class="filler" v-if="!isSimpleMode">
+        <div class="filler" >
           <span class="close-contributions" @click="hideContributions">
             <x-icon size="0.9x" />
           </span>
@@ -182,7 +182,7 @@ export default {
 
   data() {
     return {
-      isContributions: true,
+      isContributions: false,
       filteredProductions: [],
       search: '',
       errors: {
