@@ -440,7 +440,8 @@ export default {
       'setTodoListScrollPosition',
       'setTodosSearch',
       'setTimeSpent',
-      'unsetDayOff'
+      'unsetDayOff',
+      'setHelpSection'
     ]),
 
     isTabActive(tab) {
