@@ -175,7 +175,7 @@ export default {
     return {
       currentFilter: 'all_tasks',
       currentSort: 'priority',
-      currentSection: 'todos',
+      currentSection: 'board',
       filterOptions: ['all_tasks', 'due_this_week'].map(name => ({
         label: name,
         value: name

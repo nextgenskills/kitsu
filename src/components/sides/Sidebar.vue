@@ -22,7 +22,7 @@
             <h2>{{ $t('main.workspace') }}</h2>
 
             <p @click="toggleSidebar()">
-              <router-link :to="{ name: 'board' }">
+              <router-link :to="{ name: 'todos' }">
                 <kitsu-icon class="nav-icon" name="my-tasks" />
                 {{ $t('tasks.my_tasks') }}
               </router-link>
