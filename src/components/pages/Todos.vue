@@ -198,6 +198,7 @@ export default {
   },
 
   mounted() {
+    this.setHelpSection('todos')
     this.updateActiveTab()
     if (this.todosSearchText.length > 0) {
       this.$refs['todos-search-field'].setValue(this.todosSearchText)
