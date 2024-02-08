@@ -96,7 +96,7 @@
             name: 'todos',
             query: { section: 'timesheets' }
           }"
-          v-if="!isCurrentUserAdmin && !isCurrentUserClient"
+          v-if="!isCurrentUserAdmin && !isCurrentUserClient && !isSimpleMode"
         >
           {{ $t('timesheets.title') }}
         </router-link>
@@ -437,7 +437,7 @@ export default {
         options.push({ label: this.$t('edits.title'), value: 'edits' })
       }
 
-      if (this.isTVShow && !this.isCurrentUserClient) {
+      if (this.isTVShow && !this.isCurrentUserClient && !this.isSimpleMode) {
         options.push({ label: this.$t('episodes.title'), value: 'episodes' })
       }
 
@@ -478,7 +478,7 @@ export default {
       }
 
       // Add episodes for tv show only
-      if (this.isTVShow) {
+      if (this.isTVShow && !this.isSimpleMode) {
         options = options.concat([
           { label: this.$t('episodes.stats_title'), value: 'episode-stats' }
         ])
@@ -495,12 +495,12 @@ export default {
       }
 
       // Show these sections to studio members only.
-      if (!this.isCurrentUserClient) {
+      if (!this.isCurrentUserClient && !this.isSimpleMode) {
         options = options.concat([
           { label: 'separator', value: 'separator' },
           { label: this.$t('schedule.title'), value: 'schedule' }
         ])
-        if (isNotOnlyAssets) {
+        if (isNotOnlyAssets && !this.isSimpleMode) {
           options.push({ label: this.$t('quota.title'), value: 'quota' })
         }
         options.push({ label: this.$t('people.team'), value: 'team' })

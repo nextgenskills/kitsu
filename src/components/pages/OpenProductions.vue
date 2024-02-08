@@ -9,7 +9,7 @@
           class="flexrow-item kitsu-with-body"
           src="../../assets/illustrations/kitsu-band.png"
         />
-        <div class="filler">
+        <div class="filler" v-if="!isSimpleMode">
           <span class="close-contributions" @click="hideContributions">
             <x-icon size="0.9x" />
           </span>
@@ -214,6 +214,7 @@ export default {
       'isOpenProductionsLoading',
       'lastProductionScreen',
       'mainConfig',
+      'isSimpleMode',
       'openProductions'
     ])
   },
