@@ -466,12 +466,8 @@ export default {
     },
 
     updateActiveTab() {
-      if (
-        ['board', 'calendar', 'done', 'pending', 'timesheets'].includes(
-          this.$route.query.section
-        )
-      ) {
-        this.currentSection = this.$route.query.section
+
+        this.currentSection = 'board' //this.$route.query.section
         if (this.currentSection === 'board') {
           const currentProduction = this.openProductions.find(
             ({ id }) => id === this.$route.query.productionId
@@ -487,9 +483,7 @@ export default {
             })
           }
         }
-      } else {
-        this.currentSection = 'todos'
-      }
+
       this.clearSelectedTasks()
     },
 
