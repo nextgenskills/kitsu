@@ -83,7 +83,7 @@
           class="nav-item"
           :to="{
             name: 'todos',
-            query: { section: 'todos' }
+            query: { section: 'board' }
           }"
           v-if="!isCurrentUserAdmin && !isCurrentUserClient"
         >
@@ -506,7 +506,7 @@ export default {
         if (isNotOnlyAssets && !this.isSimpleMode) {
           options.push({ label: this.$t('quota.title'), value: 'quota' })
         }
-        
+
         options.push({ label: this.$t('people.team'), value: 'team' })
 
         if (this.isCurrentUserAdmin || this.isCurrentUserManager) {

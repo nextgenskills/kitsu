@@ -309,30 +309,34 @@ export default {
         production => this.getBoardStatusesByProduction(production).length
       )
       return [
+      !this.isSimpleMode ?
         {
           label: this.$t('main.tasks'),
           name: 'todos'
-        },
+        }: undefined,
         hasAvailableBoard
           ? {
               label: this.$t('board.title'),
               name: 'board'
             }
           : undefined,
+        !this.isSimpleMode ?
         {
           label: this.$t('tasks.calendar'),
           name: 'calendar'
-        },
+        }: undefined,
+        !this.isSimpleMode ?
         {
           label: `${this.$t('tasks.pending')} (${this.pendingTasks.length})`,
           name: 'pending'
-        },
+        }: undefined,
+        !this.isSimpleMode ?
         {
           label: `${this.$t('tasks.validated')} (${
             this.displayedDoneTasks.length
           })`,
           name: 'done'
-        },
+        }: undefined,
         !this.isSimpleMode ? {
           label: this.$t('timesheets.title'),
           name: 'timesheets'

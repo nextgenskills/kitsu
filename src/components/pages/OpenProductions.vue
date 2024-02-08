@@ -182,7 +182,7 @@ export default {
 
   data() {
     return {
-      isContributions: false,
+      isContributions: true,
       filteredProductions: [],
       search: '',
       errors: {
@@ -203,7 +203,8 @@ export default {
     this.productionIndex = buildNameIndex(this.openProductions)
     this.isContributions =
       this.mainConfig.is_self_hosted &&
-      preferences.getPreference('open-productions:contributions') !== 'false'
+      preferences.getPreference('open-productions:contributions') !== 'false' &&
+      !this.isSimpleMode
   },
 
   computed: {
