@@ -337,6 +337,7 @@ export default {
           label: this.$t('timesheets.title'),
           name: 'timesheets'
         }
+        : undefined
       ].filter(Boolean)
     },
 
