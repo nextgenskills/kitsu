@@ -245,6 +245,7 @@ export default {
       'todoSearchQueries',
       'todoSelectionGrid',
       'todosSearchText',
+      'isSimpleMode',
       'user'
     ]),
 
@@ -332,7 +333,7 @@ export default {
           })`,
           name: 'done'
         },
-        {
+        !this.isSimpleMode ? {
           label: this.$t('timesheets.title'),
           name: 'timesheets'
         }
